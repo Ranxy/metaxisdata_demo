@@ -256,6 +256,26 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # `make evolve` runs this: it adds one column to the shop's orders table, and the Makefile
+  # then re-syncs so the platform notices. Kept behind a profile so `up` does not start it.
+  schema-evolve:
+    image: mysql:8.4
+    command: []
+    profiles: ["tools"]
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST:-mysql-shop}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DB: ${MYSQL_DB:-shop}
+      DEMO_USER: ${DEMO_USER:-demo}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo}
+    volumes:
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/evolve.sh"]
+    depends_on:
+      mysql-shop:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   metadata-db-data:
   mysql-shop-data:

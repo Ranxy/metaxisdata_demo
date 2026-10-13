@@ -519,8 +519,9 @@ Work proceeds step by step, **one git commit per step**.
 | 2 | `mysql-shop`, `postgres-warehouse`, `starrocks-serving`, the vendored fixture, `warehouse-init` | `feat(data): add the shop, warehouse and serving databases` |
 | 3 | `bootstrap.py`: account, instances, sync, ingestion key, `state/ol.env` | `feat(bootstrap): register instances, sync metadata and issue the ingestion key` |
 | 4 | The Airflow image, the `SqlCopyOperator`, the four DAGs, `etl-runner` | `feat(etl): add the Airflow pipeline and OpenLineage lineage` |
-| 5 | Governance samples, manual SQL, application SQL, the `extra` / `llm` / `mcp` / `datax` / `ol` profiles, `evolve.sh`, the synthetic producer | `feat(samples): seed governance, manual SQL, application SQL and the optional profiles` |
-| 6 | The walkthrough in both READMEs, screenshots, `smoke` polish | `docs: add the walkthrough and screenshots` |
+| 5 | Governance samples, manual SQL, application SQL, `smoke.py`, `make evolve` | `feat(samples): seed governance, manual SQL and application SQL` |
+| 6 | The `extra` (SQL Server, MariaDB), `ol` (synthetic producer), `llm` and `mcp` profiles | `feat(profiles): add the optional engines, LLM, MCP and OpenLineage profiles` |
+| 7 | The walkthrough in both READMEs, screenshots, and a full `make reset && make up` rehearsal | `docs: add the walkthrough and screenshots` |
 
 Each step ends with the stack still runnable (`make up && make smoke`), and commit messages follow the
 conventional-commit style used by the source repo.

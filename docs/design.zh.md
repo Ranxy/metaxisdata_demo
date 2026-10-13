@@ -399,8 +399,9 @@ metadata-db(healthy)
 | 2 | `mysql-shop`、`postgres-warehouse`、`starrocks-serving`、vendoring 的 fixture、`warehouse-init` | `feat(data): add the shop, warehouse and serving databases` |
 | 3 | `bootstrap.py`：账号、实例、同步、摄入 key、`state/ol.env` | `feat(bootstrap): register instances, sync metadata and issue the ingestion key` |
 | 4 | Airflow 镜像、`SqlCopyOperator`、4 个 DAG、`etl-runner` | `feat(etl): add the Airflow pipeline and OpenLineage lineage` |
-| 5 | 治理样例、手工 SQL、应用 SQL，以及 `extra` / `llm` / `mcp` / `datax` / `ol` profile、`evolve.sh`、合成生产者 | `feat(samples): seed governance, manual SQL, application SQL and the optional profiles` |
-| 6 | 双语走查文档、截图、`smoke` 收尾 | `docs: add the walkthrough and screenshots` |
+| 5 | 治理样例、手工 SQL、应用 SQL、`smoke.py`、`make evolve` | `feat(samples): seed governance, manual SQL and application SQL` |
+| 6 | `extra`（SQL Server / MariaDB）、`ol`（合成生产者）、`llm`、`mcp` 四个可选 profile | `feat(profiles): add the optional engines, LLM, MCP and OpenLineage profiles` |
+| 7 | 双语走查文档、截图，以及完整的 `make reset && make up` 彩排 | `docs: add the walkthrough and screenshots` |
 
 每个 step 结束时栈都要仍可运行（`make up && make smoke`），提交信息遵循源码仓库使用的 conventional commits 风格。
 

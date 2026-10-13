@@ -28,6 +28,8 @@ help:
 	@echo "  make up               start the stack (PROFILE=<name> for an optional profile)"
 	@echo "  make down             stop the stack, keep its data"
 	@echo "  make reset            stop it and drop every volume"
+	@echo "  make smoke            is the demo populated?"
+	@echo "  make evolve           add a column and re-sync, to show metadata history"
 	@echo "  make logs             follow the logs"
 	@echo "  make ps               show service state"
 	@echo "  make check-secrets    fail if a credential looks committed"
@@ -39,6 +41,7 @@ help:
 
 up: .env
 	$(COMPOSE) $(PROFILE_FLAG) up -d --build
+	@$(MAKE) --no-print-directory smoke
 
 down:
 	$(COMPOSE) $(PROFILE_FLAG) down
@@ -52,6 +55,15 @@ logs:
 
 ps:
 	$(COMPOSE) $(PROFILE_FLAG) ps
+
+# Is the demo populated? `up` runs this, so a half-prepared stack is never reported as ready.
+smoke:
+	$(COMPOSE) run --rm --no-deps --entrypoint python3 bootstrap /scripts/smoke.py
+
+# One schema change plus a re-sync, so the metadata browser's history and diff light up.
+evolve:
+	$(COMPOSE) --profile tools run --rm schema-evolve
+	$(COMPOSE) run --rm --no-deps --entrypoint python3 bootstrap /scripts/resync.py
 
 check-secrets:
 	@scripts/check_secrets.sh

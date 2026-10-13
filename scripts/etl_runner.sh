@@ -55,3 +55,7 @@ echo "== etl-runner: all ${#DAGS[@]} DAGs succeeded"
 # walkthrough starts: the metadata browser and the lineage graph depend on it.
 echo "== re-syncing the instances"
 python3 /scripts/resync.py
+
+# Now that the warehouse has its layers, seed the samples that name them: a manual SQL entry,
+# an application and its report, and the governance examples.
+python3 /scripts/seed_samples.py
