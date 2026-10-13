@@ -118,6 +118,44 @@ def is_already_exists(status: int, body: dict) -> bool:
     return status == 409 or "exist" in json.dumps(body).lower()
 
 
+def metadata_children(api: Api, guid: str) -> list[tuple[str, str]]:
+    """The `(metaType, guid)` pairs directly under a metadata node."""
+    status, body = api.call("DatabaseService/ListMetadata", {"parentGuid": guid, "pageSize": 500})
+    if status != 200:
+        return []
+    return [
+        (group["metaType"], item["guid"])
+        for group in body.get("typesStoredMetadata", [])
+        for item in group.get("list", [])
+    ]
+
+
+def count_objects(api: Api, instance: str) -> dict[str, int]:
+    """How many objects of each type the registry holds for one instance.
+
+    Walks database -> schema -> object, skipping the engine's system databases. Shared by the
+    resync wait and the smoke check.
+    """
+    totals: dict[str, int] = {}
+
+    def walk(guid: str) -> None:
+        for meta_type, child in metadata_children(api, guid):
+            totals[meta_type] = totals.get(meta_type, 0) + 1
+            if meta_type in ("SCHEMA", "DATABASE"):
+                walk(child)
+
+    status, body = api.call(
+        "DatabaseService/ListDatabases", {"parent": f"instances/{instance}", "pageSize": 50}
+    )
+    if status != 200:
+        return totals
+    for database in body.get("databases", []):
+        if database.get("name", "").rsplit("/", 1)[-1] in ("information_schema", "sys", "postgres"):
+            continue
+        walk(database["guid"])
+    return totals
+
+
 def ensure_admin(api: Api) -> None:
     user = {
         "email": ADMIN_EMAIL,

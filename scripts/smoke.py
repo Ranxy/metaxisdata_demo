@@ -16,7 +16,7 @@ import sys
 import urllib.error
 import urllib.request
 
-from bootstrap import ADMIN_EMAIL, ADMIN_PASSWORD, Api, require
+from bootstrap import ADMIN_EMAIL, ADMIN_PASSWORD, Api, count_objects, require
 
 AIRFLOW_URL = os.environ.get("AIRFLOW_URL", "http://airflow:8080")
 WAREHOUSE_INSTANCE = "postgres-warehouse"
@@ -42,38 +42,6 @@ def reachable(url: str) -> bool:
             return response.status == 200
     except (urllib.error.URLError, OSError):
         return False
-
-
-def children(api: Api, guid: str) -> list[tuple[str, str]]:
-    status, body = api.call("DatabaseService/ListMetadata", {"parentGuid": guid, "pageSize": 500})
-    if status != 200:
-        return []
-    return [
-        (group["metaType"], item["guid"])
-        for group in body.get("typesStoredMetadata", [])
-        for item in group.get("list", [])
-    ]
-
-
-def count_objects(api: Api, instance: str) -> dict[str, int]:
-    totals: dict[str, int] = {}
-
-    def walk(guid: str) -> None:
-        for meta_type, child in children(api, guid):
-            totals[meta_type] = totals.get(meta_type, 0) + 1
-            if meta_type in ("SCHEMA", "DATABASE"):
-                walk(child)
-
-    status, body = api.call(
-        "DatabaseService/ListDatabases", {"parent": f"instances/{instance}", "pageSize": 50}
-    )
-    if status != 200:
-        return totals
-    for database in body.get("databases", []):
-        if database.get("name", "").rsplit("/", 1)[-1] in ("information_schema", "sys", "postgres"):
-            continue
-        walk(database["guid"])
-    return totals
 
 
 def main() -> int:
