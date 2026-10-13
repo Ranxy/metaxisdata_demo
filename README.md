@@ -1,215 +1,153 @@
 # metaxisdata demo
 
-A self-contained demo of [metaxisdata](https://github.com/Ranxy/metaxisdata), the self-hosted data
-governance and metadata platform. **One `docker compose up` brings up a small data platform
-(MySQL → PostgreSQL → StarRocks), runs an Airflow pipeline over it, feeds the platform, and leaves
-you with a populated environment to explore.**
+A ready-to-explore demo of **metaxisdata**, the self-hosted data governance and metadata platform.
 
-Nothing here is production-shaped, and every credential is a throwaway local value.
-
-- Walkthrough: below · 中文说明: [README.zh.md](README.zh.md)
-- Why it is built this way: [docs/design.md](docs/design.md) · [中文](docs/design.zh.md)
+One command brings up a small data platform — MySQL, PostgreSQL and StarRocks — plus an Airflow
+pipeline and the platform itself, already loaded with data and lineage. You only have to look.
 
 ---
 
-## What you get
+## Start it
 
-```
-                        ┌──────────────────────────────────────────────┐
-   browser ────────────▶│  metaxisdata :8083  (server + embedded SPA)  │
-  localhost:8083        └───────┬────────────────────────┬─────────────┘
-                                │ schema sync            │ POST /api/v1/lineage
-        ┌───────────────┬───────┴────────┬───────────────┴──────────┐
-        ▼               ▼                ▼                          ▼
- ┌─────────────┐ ┌────────────────┐ ┌──────────────────┐  ┌──────────────────┐
- │ mysql-shop  │ │postgres-       │ │ starrocks-serving│  │ metadata-db      │
- │ MySQL 8     │ │warehouse       │ │ StarRocks        │  │ platform store   │
- │ db: shop    │ │ db: warehouse  │ │ dbs: ods, ads    │  └──────────────────┘
- │ 8 tables    │ │ ods/dwd/ads    │ │ 5 tables         │
- │ 3 views     │ │ 12 views, 1 MV │ │ 2 views, 1 MV    │
- └──────▲──────┘ └───────▲────────┘ └────────▲─────────┘
-        │                │                   │
-        │        ┌───────┴───────────────────┴────────┐
-        └────────┤  airflow :8080 (standalone)        │
-                 │  ingest_shop_to_warehouse          │  SQL facet ──┐
-                 │  build_warehouse_layers            │  column facets┤
-                 │  publish_to_serving                │               │
-                 │  build_serving_aggregates          │               │
-                 └────────────────────────────────────┘               ▼
-   one-shot:  warehouse-init → serving-init → bootstrap → etl-runner → smoke
-```
-
-Everything is prepared for you: the databases are seeded, the platform registers and syncs its three
-sources, the pipeline runs, and the samples the walkthrough points at are created.
-
-## Requirements
-
-- Docker with Compose v2, BuildKit enabled
-- **~10 GB of free RAM** and **~8 GB of disk** — StarRocks takes most of both
-- Ports **8083** (platform) and **8080** (Airflow) free. The demo databases are deliberately *not*
-  published, so it cannot collide with anything else you have running.
-
-## Quick start
+You need **Docker** (with Compose v2), about **10 GB of free memory** and **8 GB of disk**, and
+**ports 8083 and 8080 free**.
 
 ```bash
 git clone <this repo> && cd metaxisdata-demo
 make up
 ```
 
-`make up` copies `.env.example` to `.env` on first use, builds the Airflow image, starts everything,
-waits for the pipeline, and finishes with a check that the demo is populated. A cold start pulls about
-5 GB of images and takes roughly 5–10 minutes; afterwards a restart is much faster.
+That is the whole setup. It builds one image, starts everything, seeds the databases, runs the
+pipeline and feeds the platform. A first run takes about 5–10 minutes; later runs are much faster.
 
-The last lines of a successful run say what was found. Then open **<http://localhost:8083>** and sign
-in:
+When it is ready, the last line says:
 
-| Where | Sign in as |
+```
+== smoke: the demo is populated
+```
+
+## Open it and sign in
+
+| Open | Sign in |
 | --- | --- |
-| metaxisdata (http://localhost:8083) | `admin@demo.local` / `Demo-admin-1234!` |
-| Airflow (http://localhost:8080) | `admin` / `admin` |
+| **<http://localhost:8083>** — metaxisdata | `admin@demo.local` / `Demo-admin-1234!` |
+| **<http://localhost:8080>** — Airflow, the pipeline UI | `admin` / `admin` |
 
-```bash
-make smoke      # is the demo populated? (short report, exits non-zero if not)
-make logs       # follow the stack
-make down       # stop it, keep the data
-make reset      # stop it and drop the volumes; `make up` then starts clean
+These are throwaway passwords for this local demo; nothing here is production-shaped.
+
+## What you are looking at
+
+```
+  MySQL               PostgreSQL             StarRocks            Airflow
+  mysql-shop    →     postgres-warehouse  →  starrocks-serving    :8080
+  the shop's          the warehouse:         the serving layer:   runs the four
+  orders & co.        ods → dwd → ads        views on top         pipeline steps
+      │                     │                      │                  │
+      └─────────────────────┴──────────────────────┘                  │
+                            │                                         │
+                            ▼                                         ▼
+                  metaxisdata  :8083  ←───────────────────────────────┘
+             collects every schema, and draws the lineage
 ```
 
 ---
 
-## Walkthrough
+## Take the tour
 
-### 1. Metadata collected from three different engines
+### 1. One registry, three different databases
 
-**Data → Instances.** Expect `mysql-shop` (MySQL), `postgres-warehouse` (PostgreSQL) and
-`starrocks-serving` (StarRocks), each with a recent sync time — three engines collected by the same
-registry.
+**Data → Instances.** Three databases are registered and synced: `mysql-shop` (MySQL),
+`postgres-warehouse` (PostgreSQL) and `starrocks-serving` (StarRocks).
 
-Open **Metadata**, pick `shop.orders` in the MySQL instance, and look at its columns, indexes, DDL and
-size. Then run:
+Open **Metadata** and pick `shop.orders` in the MySQL instance: columns, types, indexes, DDL and
+size. Then run
 
 ```bash
 make evolve
 ```
 
-It adds one column to `shop.orders` and re-syncs. Back in the same table's **history** there is now an
-entry summarised as `+1 column`, with the diff — which is the point of keeping a metadata registry.
+which adds a column to that table and re-syncs. Back on the same table, open its **history**: the
+change is recorded with a diff, summarised as `+1 column`.
 
-### 2. Lineage derived from SQL
+### 2. Lineage that comes from SQL
 
-**Metadata → postgres-warehouse → `warehouse.dwd.v_order_line` → Lineage.**
+Open **Metadata → postgres-warehouse → `warehouse.dwd.v_order_line`**, then its **Lineage**.
 
-The warehouse's views, materialized view and tables were created by the pipeline. The platform reads
-their definitions and derives the graph itself: upstream reaches `warehouse.ods.order_items`, and
-downstream goes through `warehouse.dwd.mv_daily_sales` to `warehouse.ads.ads_daily_sales`. Edges are
-labelled by what they are — `DIRECT`, `AGGREGATE`, `JOIN`, `GROUP` — and expanding a node shows
-per-column trails.
+The warehouse's views and materialized views were created by the pipeline; the platform reads their
+definitions and works the graph out on its own. Follow it upstream to `warehouse.ods.order_items`,
+or downstream through `warehouse.dwd.mv_daily_sales` to `warehouse.ads.ads_daily_sales`. The edges
+are labelled by what they do — `DIRECT`, `AGGREGATE`, `JOIN`, `GROUP` — and expanding a table shows
+column-by-column trails.
 
-The fixture's SQL is deliberately awkward (multi-CTE `INSERT … SELECT`, `GROUPING SETS`, `LATERAL`,
-`FILTER` on a window, `generate_series`, arrays and jsonb), so the graph exercises the analyzers
-rather than a toy schema.
+### 3. Follow the chain end to end
 
-### 3. The whole chain, five hops
-
-**Metadata → `shop.orders` (MySQL) → Lineage**, then expand downstream. The chain crosses all three
-engines:
+Open **Metadata → `shop.orders`** (the MySQL one) and expand **Lineage** downstream. The chain walks
+through all three engines:
 
 ```
 shop.orders → warehouse.ods.orders → v_order_base / v_order_line
   → mv_daily_sales / dwd_* → StarRocks ods.dwd_order_fact → ads.v_sr_* / ads.mv_sr_region_daily
 ```
 
-Roughly 400 column edges, and no node outside the three instances: had the pipeline addressed its
-databases with a different host name than the instances were registered with, the first hop would have
-shown up as an *external* dataset instead.
+### 4. The same story, told by OpenLineage
 
-### 4. Lineage derived from OpenLineage
+Open **OpenLineage → Jobs** and pick a run of `build_warehouse_layers`. You can see which datasets
+the task read and wrote, an **Airflow** link straight to the task log, and the SQL that produced the
+lineage.
 
-**OpenLineage → Overview / Jobs / Datasets / Events.** The pipeline reports every task as an
-OpenLineage run; the runs of the `INSERT … SELECT` tasks carry a SQL facet, and the cross-engine
-copies carry column facets.
+On the materialized-view task there is a warning that the statement could not be parsed — a
+limitation of Airflow's own SQL parser, surfaced here instead of silently losing the lineage.
 
-Open a run of `build_warehouse_layers` and note three things:
+### 5. Statements that are not views
 
-- the datasets it read and wrote, resolved against the registry rather than left as opaque strings;
-- the **Airflow link** back to the task log on `localhost:8080`;
-- an **extraction warning** on the materialized-view task. `REFRESH MATERIALIZED VIEW` is a statement
-  Airflow's own SQL parser cannot parse. The platform shows that instead of quietly losing the
-  lineage — the warning is expected, not a failure.
+**Manual SQL** holds a statement someone kept in a wiki instead of creating a view. **Application
+SQL** holds the statements an application reported running, so you can see which application reads
+which table. Both are already in the demo, and both appear in the lineage graph.
 
-### 5. Which applications read which tables
+### 6. People and permissions
 
-**Application SQL** lists statements reported by an application rather than inferred from a database:
-the demo registers an application, issues it a key, and reports the parameterised SQL it runs.
-**Manual SQL** holds a statement someone kept in a wiki instead of a view — the registry analyses it
-either way.
+Under **Settings** there are **Users**, **Groups**, **Roles** and the **Audit Log** — every action
+taken so far, your own included, is recorded there. **Notifications** in the sidebar collects what
+the platform wanted to tell an administrator.
 
-Both are seeded for you, and both appear in the lineage graph.
-
-### 6. Governance
-
-**Settings → Users / Groups / Roles / IAM / Audit Log**, and **Notifications** in the sidebar. The demo
-seeds a second user (`analyst@demo.local` / `Analyst-1234!`), a group and a custom role, and the audit
-log already holds everything the bootstrap and the walkthrough itself did — reading the audit log is
-itself audited.
-
-### 7. A producer that is not Airflow
+### 7. A producer from outside
 
 The platform accepts OpenLineage events from anything that speaks the protocol. This one is a
-synthetic Spark job that reports under a namespace no instance owns:
+synthetic Spark job reporting under a namespace that no database owns:
 
 ```bash
 make ol-demo
 ```
 
-The first event lands as an `external:spark-prod:…` dataset, and the workspace administrators get a
-notification saying the namespace is unmapped. The script then creates the namespace mapping and sends
-the same event again; the datasets resolve to `starrocks-serving`, and the edge appears in the graph
-between two real objects. That mapping — not a code change — is how a producer from another team is
-brought into the registry.
+The first event arrives as an `external:spark-prod:…` dataset, and the administrators get a
+notification that the namespace is unmapped. The script then registers a namespace mapping and sends
+the same event again: the datasets resolve to `starrocks-serving`, and the edge appears between two
+real tables.
 
 ---
 
-## What is not included
+## Commands
 
-Being explicit about the edges of this demo:
-
-- **Explain SQL** needs an LLM provider. Add one under *Settings → LLM Providers* (any
-  OpenAI-compatible endpoint, including one running locally) and the page works.
-- **SQL Server and MariaDB** are supported by the platform but not started here; adding them means two
-  more services, registered the same way `scripts/bootstrap.py` registers the other three.
-- **MCP** and the `mxd` CLI live in the platform repository and need an external URL; see
-  [docs/mcp.md](https://github.com/Ranxy/metaxisdata/blob/main/docs/mcp.md).
-- **DataX** is not used: its upstream binary has no reliable public source. The demo copies data with
-  a small operator instead (`airflow/plugins/sql_copy_operator.py`), and
-  `metaxisdata/test/e2e_etl` remains the reference for the DataX path.
-
-## Troubleshooting
-
-| Symptom | What to do |
+| Command | What it does |
 | --- | --- |
-| `make up` fails at the end | Run `make smoke` again; it names the check that failed. `make logs` follows the stack, `docker compose logs etl-runner` shows the pipeline. |
-| StarRocks restarts, or the pipeline's last hop fails | StarRocks wants ~4 GB to itself. Give Docker more memory, or drop it by removing `starrocks-serving`, `serving-init`, `publish_to_serving` and `build_serving_aggregates`. |
-| Ports already in use | Change `METAXISDATA_PORT` / `AIRFLOW_PORT` in `.env`. |
-| The pipeline runs but the platform has nothing new | A sync happens at the end of the pipeline, so a run that died early leaves the registry behind. Re-run it with `docker compose up -d etl-runner && docker compose wait etl-runner`. |
-| Apple Silicon | The StarRocks image is `amd64` only, so it runs under emulation: it works, slowly. |
+| `make up` | Start everything and wait until the demo is ready |
+| `make smoke` | Check that the demo is populated |
+| `make logs` | Follow the logs |
+| `make down` | Stop it, keep the data |
+| `make reset` | Stop it and delete the data; `make up` starts clean |
+| `make evolve` | Add a column and re-sync, to see metadata history |
+| `make ol-demo` | Run the outside producer, with and without a namespace mapping |
 
-## Credentials
+## If something goes wrong
 
-Everything in this repository is a throwaway local value: `demo` / `demo` for the databases,
-`admin@demo.local` / `Demo-admin-1234!` for the platform, `admin` / `admin` for Airflow. Do not use any
-of them anywhere real.
-
-Generated keys — the OpenLineage ingestion key, the application's key — are created at runtime into the
-`state/` Docker volume, never into the repository. `make check-secrets` fails if a real credential ever
-looks committed.
-
-## Repository layout
-
-| Path | What it is |
+| What you see | What to do |
 | --- | --- |
-| `docker-compose.yml` | The whole stack |
-| `fixture/` | The SQL fixture, vendored from the platform's end-to-end lineage test |
-| `airflow/dags/`, `airflow/plugins/` | The four pipeline DAGs and the cross-engine copy operator |
-| `scripts/` | Bootstrap, samples, smoke check, schema evolution, the OpenLineage producer |
-| `docs/design.md` | The design and the decisions behind it |
+| `make up` ends with a failure | Run `make smoke` — it names what is missing. `make logs` shows the stack. |
+| It stops part-way, or a StarRocks step fails | StarRocks wants about 4 GB to itself. Give Docker more memory and run `make up` again. |
+| A port is already taken | Set `METAXISDATA_PORT` or `AIRFLOW_PORT` in `.env`, then `make up`. |
+| The first run is slow | It is pulling about 5 GB of images. Later runs start in seconds. |
+
+## More
+
+- [README.zh.md](README.zh.md) — the same guide in Chinese
+- [docs/design.md](docs/design.md) — how this demo is put together, for maintainers

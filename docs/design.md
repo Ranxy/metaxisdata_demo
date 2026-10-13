@@ -286,6 +286,20 @@ custom role, an audit trail of everything the bootstrap did, and at least one no
 | Settings: identity providers | ⚠️ partial | The page renders; a full SSO login needs an external IdP |
 | SQL Server / MariaDB collection | ➖ not included | The `extra` profile is designed, not shipped |
 
+### 5.2 Out of scope for this demo
+
+Deliberately kept out, so that the README can stay a guide for visitors rather than a list of
+caveats. Each of these is a normal next step for whoever extends the demo.
+
+| Left out | Why, and what it would take |
+| --- | --- |
+| Explain SQL | Needs an LLM provider. Add any OpenAI-compatible endpoint under *Settings → LLM Providers*; nothing else changes. |
+| SQL Server, MariaDB | Supported by the platform, not started here. Two more services plus two registrations in `scripts/bootstrap.py`. |
+| MCP and the `mxd` CLI | Ship with the platform repository and need an externally reachable `external_url`; see the platform's `docs/mcp.md`. |
+| DataX | Its upstream binary has no reliable public source (the vendor mirror answers 403). The demo copies with `airflow/plugins/sql_copy_operator.py`; `metaxisdata/test/e2e_etl` remains the reference for the DataX path. |
+| Screenshots | The walkthrough describes what to expect on screen instead. |
+| Signing the demo repository's commits | Local preference, not a property of the demo. |
+
 ---
 
 ## 6. Repository layout

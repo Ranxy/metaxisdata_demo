@@ -240,6 +240,20 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | Settings：identity providers | ⚠️ 部分 | 页面可渲染；完整 SSO 登录需要外部 IdP |
 | SQL Server / MariaDB 采集 | ➖ 未包含 | `extra` profile 有设计但未实现 |
 
+### 5.2 本 demo 的范围之外
+
+这些内容是**刻意不做进 demo** 的，这样 README 才能保持成「给来访者的指南」，而不是一份限制清单。
+每一项都是后续扩展时的正常下一步。
+
+| 未包含 | 原因与代价 |
+| --- | --- |
+| Explain SQL | 需要 LLM provider。在 *Settings → LLM Providers* 里接任意 OpenAI 兼容端点即可，其他都不用改。 |
+| SQL Server、MariaDB | 平台支持，但本 demo 没有启动；代价是两个额外服务，加 `scripts/bootstrap.py` 里的两处注册。 |
+| MCP 与 `mxd` CLI | 随平台仓库发布，且需要外部可访问的 `external_url`，见平台 `docs/mcp.md`。 |
+| DataX | 上游二进制没有可靠的公开来源（厂商镜像返回 403）。demo 改用 `airflow/plugins/sql_copy_operator.py` 搬运；DataX 路径的参考仍是 `metaxisdata/test/e2e_etl`。 |
+| 截图 | 走查文档改为描述「屏幕上应该看到什么」。 |
+| demo 仓库提交签名 | 属于本地偏好，不是 demo 本身的属性。 |
+
 ---
 
 ## 6. 目录结构
