@@ -396,9 +396,9 @@ metadata-db(healthy)
 | 0 | 本方案、双语 README、`.gitignore`、密钥守卫 | `docs: add the demo design and repository scaffolding` |
 | 1 | `docker-compose.yml`（`metadata-db` + `metaxisdata`）、`.env.example`、Makefile | `feat(compose): run the platform with its metadata store` |
 | 2 | `mysql-shop`、`postgres-warehouse`、`starrocks-serving`、vendoring 的 fixture、`warehouse-init` | `feat(data): add the shop, warehouse and serving databases` |
-| 3 | `bootstrap.py`：账号、实例、同步、摄入 key、手工/应用 SQL、治理样例 | `feat(bootstrap): register instances, sync metadata and seed samples` |
+| 3 | `bootstrap.py`：账号、实例、同步、摄入 key、`state/ol.env` | `feat(bootstrap): register instances, sync metadata and issue the ingestion key` |
 | 4 | Airflow 镜像、`SqlCopyOperator`、4 个 DAG、`etl-runner` | `feat(etl): add the Airflow pipeline and OpenLineage lineage` |
-| 5 | `extra` / `llm` / `mcp` / `datax` / `ol` profile、`evolve.sh`、合成生产者 | `feat(profiles): add the optional engines, LLM, MCP and DataX profiles` |
+| 5 | 治理样例、手工 SQL、应用 SQL，以及 `extra` / `llm` / `mcp` / `datax` / `ol` profile、`evolve.sh`、合成生产者 | `feat(samples): seed governance, manual SQL, application SQL and the optional profiles` |
 | 6 | 双语走查文档、截图、`smoke` 收尾 | `docs: add the walkthrough and screenshots` |
 
 每个 step 结束时栈都要仍可运行（`make up && make smoke`），提交信息遵循源码仓库使用的 conventional commits 风格。

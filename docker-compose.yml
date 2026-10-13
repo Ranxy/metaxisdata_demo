@@ -137,8 +137,43 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Creates the demo's platform state: the administrator account, the three instances, a
+  # full metadata sync, and the OpenLineage ingestion key that the Airflow container waits
+  # for. Idempotent, and it uses only the Python standard library.
+  bootstrap:
+    image: python:3.12-alpine
+    command: []
+    environment:
+      METAXISDATA_URL: http://metaxisdata:8083
+      STATE_DIR: /state
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@demo.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Demo-admin-1234!}
+      DEMO_USER: ${DEMO_USER:-demo}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql-shop}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DB: ${MYSQL_DB:-shop}
+      PG_HOST: ${PG_HOST:-postgres-warehouse}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DB: ${PG_DB:-warehouse}
+      SR_HOST: ${SR_HOST:-starrocks-serving}
+      SR_PORT: ${SR_PORT:-9030}
+    volumes:
+      - ./scripts:/scripts:ro
+      - demo-state:/state
+    entrypoint: ["python3", "/scripts/bootstrap.py"]
+    depends_on:
+      metaxisdata:
+        condition: service_healthy
+      warehouse-init:
+        condition: service_completed_successfully
+      serving-init:
+        condition: service_completed_successfully
+    restart: "no"
+
 volumes:
   metadata-db-data:
   mysql-shop-data:
   postgres-warehouse-data:
   starrocks-serving-data:
+  demo-state:
