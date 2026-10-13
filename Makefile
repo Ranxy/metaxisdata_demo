@@ -23,16 +23,18 @@ PROFILE_FLAG := $(if $(PROFILE),--profile $(PROFILE),)
 .PHONY: help up down reset logs ps check-secrets
 
 help:
-	@echo "metaxisdata demo"
+	@echo "metaxisdata demo -- start it, then open http://localhost:8083"
 	@echo ""
-	@echo "  make up               start the stack (PROFILE=<name> for an optional profile)"
-	@echo "  make down             stop the stack, keep its data"
-	@echo "  make reset            stop it and drop every volume"
-	@echo "  make smoke            is the demo populated?"
-	@echo "  make evolve           add a column and re-sync, to show metadata history"
-	@echo "  make logs             follow the logs"
-	@echo "  make ps               show service state"
-	@echo "  make check-secrets    fail if a credential looks committed"
+	@echo "  make up           start everything and wait until the demo is ready"
+	@echo "  make smoke        check that the demo is populated"
+	@echo "  make logs         follow the logs"
+	@echo "  make down         stop it, keep the data"
+	@echo "  make reset        stop it and delete the data"
+	@echo "  make evolve       add a column and re-sync, to see metadata history"
+	@echo "  make ol-demo      run an OpenLineage producer from outside Airflow"
+	@echo "  make ps           show service state"
+	@echo ""
+	@echo "See README.md for the guided tour."
 
 # Compose reads .env automatically; create it from the documented example on first use.
 .env:
