@@ -1,4 +1,5 @@
-# metaxisdata demo -- the platform and the databases it collects from.
+# metaxisdata demo -- the platform, the databases it collects from, and the one-shot
+# containers that prepare them.
 #
 #   cp .env.example .env      (or just `make up`, which copies it for you)
 #   make up                   start the stack
@@ -9,6 +10,8 @@
 name: metaxisdata-demo
 
 services:
+  # --- platform -----------------------------------------------------------------
+
   # The platform's own metadata store. Not published: only metaxisdata needs it.
   metadata-db:
     image: postgres:16-alpine
@@ -25,8 +28,8 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # The platform. The image embeds the web UI, so this is the only published port
-  # a user needs. Its schema is migrated on start-up.
+  # The platform itself. The image embeds the web UI, so this is the only port a user
+  # needs to open. Its schema is migrated on start-up.
   metaxisdata:
     image: ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.1}
     environment:
@@ -40,5 +43,102 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # --- collected databases ------------------------------------------------------
+
+  # The shop's OLTP database. Seeded from fixture/mysql on first start.
+  mysql-shop:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-demo-root}
+      MYSQL_DATABASE: ${MYSQL_DB:-shop}
+      # The account the platform collects with, and that the pipeline reads from.
+      MYSQL_USER: ${DEMO_USER:-demo}
+      MYSQL_PASSWORD: ${DEMO_PASSWORD:-demo}
+    volumes:
+      - mysql-shop-data:/var/lib/mysql
+      # Runs once, on an empty data directory, in filename order.
+      - ./fixture/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  # The warehouse: landing (ods), transformation (dwd) and serving (ads) layers.
+  postgres-warehouse:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DEMO_USER:-demo}
+      POSTGRES_PASSWORD: ${DEMO_PASSWORD:-demo}
+      POSTGRES_DB: ${PG_DB:-warehouse}
+    volumes:
+      - postgres-warehouse-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEMO_USER:-demo} -d ${PG_DB:-warehouse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # The serving layer. The all-in-one image runs a frontend and a backend together and
+  # wants roughly 4 GB to itself, so the memory limit is explicit.
+  starrocks-serving:
+    image: starrocks/allin1-ubuntu:4.1-latest
+    mem_limit: 4g
+    volumes:
+      - starrocks-serving-data:/data/deploy/starrocks
+    healthcheck:
+      test: ["CMD-SHELL", "/data/deploy/health_check.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    restart: unless-stopped
+
+  # --- one-shot preparation -----------------------------------------------------
+  #
+  # Both use stock images that already ship the client they need, so the demo needs no
+  # custom image and no package downloads at build time. Both are idempotent, so `make up`
+  # may re-run them at any time.
+
+  # Creates the warehouse schemas.
+  warehouse-init:
+    image: postgres:16-alpine
+    command: []
+    environment:
+      PGHOST: ${PG_HOST:-postgres-warehouse}
+      PGUSER: ${DEMO_USER:-demo}
+      PGPASSWORD: ${DEMO_PASSWORD:-demo}
+      PGDATABASE: ${PG_DB:-warehouse}
+    volumes:
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/warehouse_init.sh"]
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+    restart: "no"
+
+  # Creates the StarRocks landing tables, views and async materialized view. StarRocks
+  # speaks the MySQL protocol, so a plain mysql client is enough.
+  serving-init:
+    image: mysql:8.4
+    command: []
+    environment:
+      SR_HOST: ${SR_HOST:-starrocks-serving}
+      SR_PORT: ${SR_PORT:-9030}
+    volumes:
+      - ./fixture:/fixture:ro
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/serving_init.sh"]
+    depends_on:
+      starrocks-serving:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   metadata-db-data:
+  mysql-shop-data:
+  postgres-warehouse-data:
+  starrocks-serving-data:

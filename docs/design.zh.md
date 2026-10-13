@@ -142,10 +142,11 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | `postgres-warehouse` | `postgres:16` | —（可选 `15432`） | 数仓，数据库 `warehouse`，schema `ods`/`dwd`/`ads` |
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`，`mem_limit: 4g` | —（可选 `19030`/`18030`） | OLAP 服务层，数据库 `ods`/`ads` |
 | `airflow` | `docker/Dockerfile.airflow`（`apache/airflow:3.1.8-python3.12` + providers） | `8080:8080` | `airflow standalone`：webserver + scheduler + triggerer |
-| `warehouse-init` | `docker/Dockerfile.tools` | — | 等健康后建 PG schema、下 StarRocks DDL |
-| `bootstrap` | 同一 tools 镜像 | — | 建管理员、注册实例、同步、签发摄入 key、灌手工 SQL/应用 SQL/治理样例 |
+| `warehouse-init` | `postgres:16-alpine`（自带 psql） | — | 建 PG schema |
+| `serving-init` | `mysql:8.4`（自带 mysql 客户端） | — | 下 StarRocks 落表与视图 DDL |
+| `bootstrap` | `python:3.12-alpine`（只用标准库） | — | 建管理员、注册实例、同步、签发摄入 key、灌样例 |
 | `etl-runner` | Airflow 镜像 | — | 按序触发 4 个 DAG 并等待 |
-| `smoke` | tools 镜像 | — | 轻量检查环境是否已填充 |
+| `smoke` | `python:3.12-alpine`（只用标准库） | — | 轻量检查环境是否已填充 |
 | `[mssql-erp]` `[mariadb-crm]` | `mssql:2019-latest`、`mariadb:11` | — | `extra` profile：多两种引擎（SQL Server 仅元数据） |
 | `[ollama]` | `ollama/ollama` | `11434:11434` | `llm` profile：本地 OpenAI 兼容端点，Explain SQL 可离线 |
 | `[mxd]` | demo 工具链构建 | — | `mcp` profile：设备登录与 CLI 读回 |
@@ -252,19 +253,21 @@ metaxisdata-demo/
 │   └── images/                      # README 引用的截图
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
-│   ├── Dockerfile.tools             # psql/mysql 客户端 + python，供一次性容器使用
 │   ├── Dockerfile.datax             # 可选 profile
 │   └── entrypoint-airflow.sh        # 等 state/ol.env → source → airflow standalone
 ├── airflow/
 │   ├── dags/{ingest_shop_to_warehouse,build_warehouse_layers,publish_to_serving,build_serving_aggregates}.py
 │   └── plugins/sql_copy_operator.py # 跨库搬运并上报 OpenLineage facet
 ├── fixture/                         # 从 test/e2e_etl vendoring，仅重命名库/schema
+│   ├── README.md                    # 为什么复用、改了哪些名字
 │   ├── UPSTREAM                     # 来源仓库与 commit
-│   ├── mysql/{10_schema,20_seed,90_views,99_grants}.sql
+│   ├── mysql/{10_schema,20_seed,90_views}.sql
 │   ├── pg/{05_ods_ddl,10_dwd_ddl,20_dwd_load,30_ads_ddl,40_ads_load,50_experimental_pg_features}.sql
 │   └── starrocks/{10_ods_ddl,20_ads_ddl}.sql
 ├── scripts/
-│   ├── warehouse_init.sh            # schema + StarRocks DDL
+│   ├── vendor_fixture.sh            # 从源仓库重新 vendoring
+│   ├── warehouse_init.sh            # PG schema（在 postgres:16-alpine 里跑）
+│   ├── serving_init.sh              # StarRocks DDL（在 mysql:8.4 里跑）
 │   ├── bootstrap.py                 # 账号/实例/同步/摄入 key/治理/样例
 │   ├── etl_runner.sh                # 按序触发 DAG
 │   ├── smoke.py                     # 轻量「是否已填充」检查

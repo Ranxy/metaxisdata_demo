@@ -156,10 +156,11 @@ Docker 29.9.0 / Compose 5.6.0, 24 cores, 45 GB RAM, 628 GB free on `/var/lib/doc
 | `postgres-warehouse` | `postgres:16` | — (opt-in `15432`) | Warehouse, database `warehouse`, schemas `ods`/`dwd`/`ads` |
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`, `mem_limit: 4g` | — (opt-in `19030`/`18030`) | Serving layer, databases `ods`/`ads` |
 | `airflow` | built from `docker/Dockerfile.airflow` (`apache/airflow:3.1.8-python3.12` + providers) | `8080:8080` | `airflow standalone`: webserver + scheduler + triggerer |
-| `warehouse-init` | built from `docker/Dockerfile.tools` | — | Waits for health, creates PG schemas and StarRocks DDL |
-| `bootstrap` | the same tools image | — | Creates the admin, registers instances, syncs, issues the ingestion key, seeds samples |
+| `warehouse-init` | `postgres:16-alpine` (client included) | — | Creates the PG schemas |
+| `serving-init` | `mysql:8.4` (client included) | — | Applies the StarRocks landing and serving DDL |
+| `bootstrap` | `python:3.12-alpine` (standard library only) | — | Creates the admin, registers instances, syncs, issues the ingestion key, seeds samples |
 | `etl-runner` | the Airflow image | — | Triggers the four DAGs in order and waits for each |
-| `smoke` | the tools image | — | Lightweight check that the environment is populated |
+| `smoke` | `python:3.12-alpine` (standard library only) | — | Lightweight check that the environment is populated |
 | `[mssql-erp]`, `[mariadb-crm]` | `mcr.microsoft.com/mssql/server:2019-latest`, `mariadb:11` | — | `extra` profile: two more engines, metadata-only and MySQL-family |
 | `[ollama]` | `ollama/ollama` | `11434:11434` | `llm` profile: a local OpenAI-compatible endpoint so Explain SQL works offline |
 | `[mxd]` | built from the demo toolchain | — | `mcp` profile: device login and read-back through the CLI |
@@ -297,7 +298,6 @@ metaxisdata-demo/
 │   └── images/                      # screenshots referenced by the README
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
-│   ├── Dockerfile.tools             # psql/mysql clients + python, for the one-shot containers
 │   ├── Dockerfile.datax             # optional profile
 │   └── entrypoint-airflow.sh        # wait for state/ol.env, source it, exec airflow standalone
 ├── airflow/
@@ -308,12 +308,15 @@ metaxisdata-demo/
 │   │   └── build_serving_aggregates.py
 │   └── plugins/sql_copy_operator.py # cross-engine copy that reports OpenLineage facets
 ├── fixture/                         # vendored from test/e2e_etl, databases/schemas renamed
+│   ├── README.md                    # why it is reused, and what changed
 │   ├── UPSTREAM                     # source repo + commit
-│   ├── mysql/{10_schema,20_seed,90_views,99_grants}.sql
+│   ├── mysql/{10_schema,20_seed,90_views}.sql
 │   ├── pg/{05_ods_ddl,10_dwd_ddl,20_dwd_load,30_ads_ddl,40_ads_load,50_experimental_pg_features}.sql
 │   └── starrocks/{10_ods_ddl,20_ads_ddl}.sql
 ├── scripts/
-│   ├── warehouse_init.sh            # schemas + StarRocks DDL
+│   ├── vendor_fixture.sh            # re-vendor the fixture from the source repo
+│   ├── warehouse_init.sh            # PG schemas  (runs in a postgres:16-alpine container)
+│   ├── serving_init.sh              # StarRocks DDL (runs in a mysql:8.4 container)
 │   ├── bootstrap.py                 # account, instances, sync, ingestion key, governance, samples
 │   ├── etl_runner.sh                # trigger the DAGs in order
 │   ├── smoke.py                     # light "is it populated?" check
