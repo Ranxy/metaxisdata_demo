@@ -177,6 +177,10 @@ Docker 29.9.0 / Compose 5.6.0, 24 cores, 45 GB RAM, 628 GB free on `/var/lib/doc
 | `datax` | DataX-based variants of DAGs 1 and 3 | Faithful replay of `test/e2e_etl`; needs a local DataX install |
 | `ports` | publishes the demo databases on 1xxxx | Inspecting them with a local client |
 
+**Shipped today: the default stack and the `ol` profile** (a producer that is not Airflow, with the
+namespace-mapping walkthrough). `lite`, `extra`, `llm`, `mcp`, `datax` and `ports` are designed but not
+implemented; the README's *What is not included* section states what that means in practice.
+
 ### 3.4 Resource budget
 
 | Component | Resident memory | Image size |
@@ -267,20 +271,20 @@ custom role, an audit trail of everything the bootstrap did, and at least one no
 | Table + column lineage | ✅ default | Views, materialized views, OpenLineage, manual SQL |
 | Manual SQL | ✅ default | One entry seeded by `bootstrap` |
 | Application SQL | ✅ default | Application + key + report seeded by `bootstrap` |
-| Explain SQL | ⚙️ `llm` profile | Local OpenAI-compatible endpoint, or a cloud key |
+| Explain SQL | ⚠️ needs your own LLM provider | Add any OpenAI-compatible endpoint in Settings |
 | OpenLineage browse (overview/jobs/datasets/events/run detail) | ✅ default | The four DAGs' events |
-| Namespace mapping | ⚙️ `ol` profile | Unmapped event → external dataset → mapping fixes it |
+| Namespace mapping | ✅ `make ol-demo` | Unmapped event → external dataset → mapping fixes it |
 | OpenLineage API keys | ✅ default | One key issued by `bootstrap` (masked in the UI) |
 | Airflow deep links | ✅ default | Derived from the event's airflow facet |
 | Notifications | ✅ default | Unmapped-namespace notice, plus an ingestion-failure sample |
-| MCP + OAuth consent | ⚙️ `mcp` profile | `external_url` on loopback |
-| Device login + `mxd` CLI | ⚙️ `mcp` profile | `mxd auth login` |
+| MCP + OAuth consent | ➖ not included | Needs `external_url` and an MCP client; see the platform's docs/mcp.md |
+| Device login + `mxd` CLI | ➖ not included | The CLI ships with the platform, not with this demo |
 | Settings: general, environments, users, roles, groups, IAM | ✅ default | Seeded / rendered |
-| Settings: LLM providers | ⚙️ `llm` profile | As above |
+| Settings: LLM providers | ⚠️ needs your own provider | As above |
 | Settings: applications | ✅ default | Seeded |
 | Settings: OpenLineage (mappings, keys, retention) | ✅ default | Seeded |
 | Settings: identity providers | ⚠️ partial | The page renders; a full SSO login needs an external IdP |
-| SQL Server / MariaDB collection | ⚙️ `extra` profile | Metadata-only for SQL Server |
+| SQL Server / MariaDB collection | ➖ not included | The `extra` profile is designed, not shipped |
 
 ---
 
@@ -476,14 +480,17 @@ Rules that keep the repo publishable:
 
 ## 9. Verification
 
-`make smoke` (`scripts/smoke.py`) answers one question — *is the demo populated?* — and prints a short report:
+`make smoke` (`scripts/smoke.py`) answers one question -- *is the demo populated?* -- and prints a
+short report. `make up` runs it last, so a half-prepared stack is never reported as ready:
 
-1. every long-running service is healthy and every one-shot service exited 0;
-2. `GET /healthz` is 200 and the admin can log in;
-3. three instances exist with a non-empty `last_sync_time`;
-4. each instance exposes tables and at least one view or materialized view;
-5. `shop.orders` has both upstream and downstream lineage, and the graph reaches StarRocks;
-6. OpenLineage holds at least one run per DAG.
+1. the platform answers and the demo admin can sign in;
+2. the three instances are registered and every one has synced;
+3. each instance exposes tables and at least one view or materialized view;
+4. the lineage chain starts at the MySQL source, crosses the warehouse, and reaches the serving
+   layer -- with no endpoint that fell back to an external dataset;
+5. OpenLineage holds runs, and every pipeline DAG reported to it;
+6. the manual SQL, application and governance samples exist;
+7. the audit log has entries, and Airflow answers its health check.
 
 No numeric baselines, no ported `verify_chain.sql`. Anything deeper belongs to the product's own test suites,
 not to this repo.

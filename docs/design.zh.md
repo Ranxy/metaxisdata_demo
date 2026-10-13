@@ -163,6 +163,9 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | `datax` | DAG 1/3 的 DataX 版本 | 保真复刻 `test/e2e_etl`（需本机 DataX） |
 | `ports` | 把数据库端口映射到 1xxxx | 用本地客户端连进去看数据 |
 
+**目前已交付：默认栈 + `ol` profile**（非 Airflow 生产者，配命名空间映射走查）。`lite`、`extra`、
+`llm`、`mcp`、`datax`、`ports` 有设计但尚未实现；实际影响见 README 的「不包含的内容」。
+
 ### 3.4 资源预算
 
 | 组件 | 常驻内存 | 镜像体积 |
@@ -222,20 +225,20 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | 表级 + 列级血缘 | ✅ 默认 | 视图、物化视图、OpenLineage、手工 SQL |
 | 手工 SQL | ✅ 默认 | `bootstrap` 灌一条 |
 | 应用 SQL | ✅ 默认 | 应用 + key + 报表由 `bootstrap` 灌入 |
-| Explain SQL | ⚙️ `llm` profile | 本地 OpenAI 兼容端点或云端 key |
+| Explain SQL | ⚠️ 需自备 LLM provider | 在 Settings 里接任意 OpenAI 兼容端点 |
 | OpenLineage 浏览（overview/jobs/datasets/events/run 详情） | ✅ 默认 | 四个 DAG 的事件 |
-| 命名空间映射 | ⚙️ `ol` profile | 未映射事件 → external dataset → 建映射修复 |
+| 命名空间映射 | ✅ `make ol-demo` | 未映射事件 → external dataset → 建映射修复 |
 | OpenLineage API Keys | ✅ 默认 | `bootstrap` 签发 1 个（界面显示 masked） |
 | Airflow 深链 | ✅ 默认 | 事件自带 airflow facet |
 | 通知（SSE 收件箱） | ✅ 默认 | 未映射命名空间通知 + 一条摄入失败样例 |
-| MCP + OAuth 同意页 | ⚙️ `mcp` profile | loopback 上的 `external_url` |
-| 设备登录 + `mxd` CLI | ⚙️ `mcp` profile | `mxd auth login` |
+| MCP + OAuth 同意页 | ➖ 未包含 | 需要 `external_url` 与 MCP 客户端，见平台 docs/mcp.md |
+| 设备登录 + `mxd` CLI | ➖ 未包含 | CLI 随平台仓库发布，不在本 demo 内 |
 | Settings：general/environments/users/roles/groups/IAM | ✅ 默认 | 已预置/可渲染 |
-| Settings：LLM providers | ⚙️ `llm` profile | 同上 |
+| Settings：LLM providers | ⚠️ 需自备 provider | 同上 |
 | Settings：applications | ✅ 默认 | 已预置 |
 | Settings：OpenLineage（映射/keys/保留期） | ✅ 默认 | 已预置 |
 | Settings：identity providers | ⚠️ 部分 | 页面可渲染；完整 SSO 登录需要外部 IdP |
-| SQL Server / MariaDB 采集 | ⚙️ `extra` profile | SQL Server 仅元数据 |
+| SQL Server / MariaDB 采集 | ➖ 未包含 | `extra` profile 有设计但未实现 |
 
 ---
 
@@ -359,14 +362,16 @@ metadata-db(healthy)
 
 ## 9. 验证（轻量）
 
-`make smoke`（`scripts/smoke.py`）只回答一个问题——**演示环境是否已填充**：
+`make smoke`（`scripts/smoke.py`）只回答一个问题——**演示环境是否已填充**；`make up` 最后会跑它，
+因此「半填充」的环境不会被误报为就绪：
 
-1. 常驻服务 healthy、一次性服务退出码 0；
-2. `GET /healthz` 200，管理员能登录；
-3. 三个实例存在且 `last_sync_time` 非空；
-4. 每个实例都有表，且至少一个视图或物化视图；
-5. `shop.orders` 既有上游也有下游，且图能走到 StarRocks；
-6. OpenLineage 里每个 DAG 至少 1 个 run。
+1. 平台可访问，demo 管理员能登录；
+2. 三个实例已注册且都同步过；
+3. 每个实例都有表，且至少一个视图或物化视图；
+4. 血缘从 MySQL 源出发、穿过数仓、到达服务层，且没有端点退化为 external dataset；
+5. OpenLineage 有 run，且四个 DAG 都上报过；
+6. 手工 SQL、应用与治理样例都已存在；
+7. 审计日志有记录，Airflow 健康检查通过。
 
 不做数字基线，不移植 `verify_chain.sql`。更深的校验属于产品自身的测试套件，不属于本仓库。
 
