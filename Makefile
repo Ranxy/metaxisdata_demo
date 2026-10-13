@@ -41,6 +41,8 @@ help:
 
 up: .env
 	$(COMPOSE) $(PROFILE_FLAG) up -d --build
+	@echo "waiting for the pipeline to finish (it takes a couple of minutes on a cold start)"
+	@$(COMPOSE) wait etl-runner
 	@$(MAKE) --no-print-directory smoke
 
 down:
@@ -67,3 +69,9 @@ evolve:
 
 check-secrets:
 	@scripts/check_secrets.sh
+
+# Show the namespace-mapping story: the same event first lands outside any instance, then
+# resolves to a real one once a mapping exists.
+ol-demo:
+	$(COMPOSE) --profile ol run --rm ol-producer
+	$(COMPOSE) --profile ol run --rm ol-producer --map

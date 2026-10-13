@@ -276,6 +276,27 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Optional (`--profile ol`): a producer that is not Airflow, so the namespace-mapping story
+  # can be shown. `make ol-demo` runs it twice: once unmapped, then again after creating the
+  # mapping that binds the namespace to an instance.
+  ol-producer:
+    image: python:3.12-alpine
+    command: []
+    profiles: ["ol"]
+    environment:
+      METAXISDATA_URL: http://metaxisdata:8083
+      STATE_DIR: /state
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@demo.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Demo-admin-1234!}
+    volumes:
+      - ./scripts:/scripts:ro
+      - demo-state:/state:ro
+    entrypoint: ["python3", "/scripts/emit_openlineage.py"]
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+
 volumes:
   metadata-db-data:
   mysql-shop-data:
