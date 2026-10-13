@@ -94,13 +94,10 @@ shop.orders → warehouse.ods.orders → v_order_base / v_order_line
 
 ### 4. 同一个故事，由 OpenLineage 讲述
 
-打开 **OpenLineage → Jobs**，选 `build_warehouse_layers` 的某个 run。可以看到这个 task 读了哪些数据集、
-写了哪些数据集，一条直达 task 日志的 **Airflow** 链接，以及产生这段血缘的 SQL。
+打开 **OpenLineage → Jobs**，任选一个 run —— 比如把某张表从商城搬到数仓的 `copy_*` 任务。可以看到它读了
+哪些数据集、写了哪些数据集，每个都解析到拥有它的数据库，以及一条直达 task 日志的 **Airflow** 链接。
 
-物化视图那个 task 上有一条「语句无法解析」的告警 —— 这是 Airflow 自身 SQL 解析器的限制，平台选择把它显示出来，
-而不是悄悄丢掉这段血缘。
-
-![OpenLineage run：读写的数据集、跳转 Airflow 任务日志的链接，以及那条无法解析的语句](assets/openlineage-run.png)
+![OpenLineage run：读写的数据集及其命名空间，以及跳转 Airflow 任务日志的链接](assets/openlineage-run.png)
 
 ### 5. 不是视图的语句
 

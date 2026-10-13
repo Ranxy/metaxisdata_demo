@@ -97,14 +97,11 @@ shop.orders → warehouse.ods.orders → v_order_base / v_order_line
 
 ### 4. The same story, told by OpenLineage
 
-Open **OpenLineage → Jobs** and pick a run of `build_warehouse_layers`. You can see which datasets
-the task read and wrote, an **Airflow** link straight to the task log, and the SQL that produced the
-lineage.
+Open **OpenLineage → Jobs** and open a run — for instance one of the `copy_*` tasks that moved a table
+from the shop into the warehouse. You can see the datasets it read and wrote, each resolved to the
+database that owns it, and an **Airflow** link straight to the task log.
 
-On the materialized-view task there is a warning that the statement could not be parsed — a
-limitation of Airflow's own SQL parser, surfaced here instead of silently losing the lineage.
-
-![An OpenLineage run: the datasets it read and wrote, a link to the Airflow task log, and the statement that could not be parsed](assets/openlineage-run.png)
+![An OpenLineage run: the input and output datasets with their namespaces, and a link to the Airflow task log](assets/openlineage-run.png)
 
 ### 5. Statements that are not views
 
