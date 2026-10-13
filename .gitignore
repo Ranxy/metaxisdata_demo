@@ -1,0 +1,16 @@
+# Local configuration (copy .env.example to .env)
+.env
+
+# Runtime state: generated ingestion/application keys, tokens, reports.
+state/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Logs and editor/OS noise
+*.log
+.DS_Store
+.idea/
+.vscode/
