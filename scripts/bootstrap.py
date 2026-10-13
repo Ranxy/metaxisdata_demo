@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 import urllib.error
 import urllib.request
@@ -189,25 +190,31 @@ def ensure_instances(api: Api) -> list[str]:
     return names
 
 
-def ensure_ingestion_key(api: Api) -> str:
-    """Issue the key Airflow ships events with, and hand it to the Airflow container.
+STATE_FILE = "ol.env"
 
-    The key is a secret: it is written to the state volume (gitignored) and never to the
-    repository.
+
+def _state_path() -> str:
+    return os.path.join(STATE_DIR, STATE_FILE)
+
+
+def read_state_key() -> str:
+    """Read back the ingestion key from a previous run, if there is one."""
+    try:
+        with open(_state_path(), encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("DEMO_OPENLINEAGE_KEY="):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        return ""
+    return ""
+
+
+def write_state(plaintext: str) -> None:
+    """Hand the key to the Airflow container through the shared state volume.
+
+    The value is shell-quoted: the Airflow entrypoint sources this file, and the transport is
+    a JSON object that must survive that.
     """
-    status, body = api.call("OpenLineageService/ListAPIKeys", {})
-    require(status, body, "listing ingestion keys")
-    for key in body.get("keys", []):
-        if key.get("description") == "airflow":
-            print("   ingestion key already issued; keeping it")
-            return ""
-
-    status, body = api.call("OpenLineageService/CreateAPIKey", {"description": "airflow"})
-    require(status, body, "issuing the ingestion key")
-    plaintext = body.get("key", "")
-    if not plaintext:
-        raise RuntimeError("the ingestion key response carried no key")
-
     transport = {
         "type": "http",
         "url": BASE,
@@ -215,12 +222,45 @@ def ensure_ingestion_key(api: Api) -> str:
         "auth": {"type": "api_key", "apiKey": plaintext},
     }
     os.makedirs(STATE_DIR, exist_ok=True)
-    path = os.path.join(STATE_DIR, "ol.env")
+    path = _state_path()
     with open(path, "w", encoding="utf-8") as handle:
-        handle.write(f"AIRFLOW__OPENLINEAGE__TRANSPORT={json.dumps(transport)}\n")
-        handle.write(f"DEMO_OPENLINEAGE_KEY={plaintext}\n")
-    os.chmod(path, 0o600)
-    print(f"   ingestion key issued and written to {path}")
+        handle.write(f"AIRFLOW__OPENLINEAGE__TRANSPORT={shlex.quote(json.dumps(transport))}\n")
+        handle.write(f"DEMO_OPENLINEAGE_KEY={shlex.quote(plaintext)}\n")
+    # The Airflow container runs as its own user and only has to read this file. It lives in
+    # a Docker volume on the demo host, never in the repository.
+    os.chmod(path, 0o644)
+
+
+def ensure_ingestion_key(api: Api) -> str:
+    """Issue the key Airflow ships events with, once.
+
+    The key is a secret: it is written to the state volume (gitignored) and never to the
+    repository. A key already handed out is reused rather than re-issued, so re-running the
+    demo does not leave a trail of live keys behind.
+    """
+    plaintext = read_state_key()
+    if plaintext:
+        write_state(plaintext)
+        print("   ingestion key already handed out; state file refreshed")
+        return plaintext
+
+    # No usable key on disk, so any key the platform still holds is orphaned: revoke it and
+    # issue a fresh one.
+    status, body = api.call("OpenLineageService/ListAPIKeys", {})
+    require(status, body, "listing ingestion keys")
+    for key in body.get("apiKeys", []):
+        if key.get("description") == "airflow":
+            api.call("OpenLineageService/RevokeAPIKey", {"name": key["name"]})
+            print(f"   revoked key {key['name']}, which nothing holds any more")
+
+    status, body = api.call("OpenLineageService/CreateAPIKey", {"description": "airflow"})
+    require(status, body, "issuing the ingestion key")
+    plaintext = body.get("key", "")
+    if not plaintext:
+        raise RuntimeError("the ingestion key response carried no key")
+
+    write_state(plaintext)
+    print(f"   ingestion key issued and written to {_state_path()}")
     return plaintext
 
 

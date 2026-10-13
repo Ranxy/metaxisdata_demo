@@ -157,7 +157,7 @@ Docker 29.9.0 / Compose 5.6.0, 24 cores, 45 GB RAM, 628 GB free on `/var/lib/doc
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`, `mem_limit: 4g` | — (opt-in `19030`/`18030`) | Serving layer, databases `ods`/`ads` |
 | `airflow` | built from `docker/Dockerfile.airflow` (`apache/airflow:3.1.8-python3.12` + providers) | `8080:8080` | `airflow standalone`: webserver + scheduler + triggerer |
 | `warehouse-init` | `postgres:16-alpine` (client included) | — | Creates the PG schemas |
-| `serving-init` | `mysql:8.4` (client included) | — | Applies the StarRocks landing and serving DDL |
+| `serving-init` | `mysql:8.4` (client included) | — | Creates the StarRocks landing tables |
 | `bootstrap` | `python:3.12-alpine` (standard library only) | — | Creates the admin, registers instances, syncs, issues the ingestion key, seeds samples |
 | `etl-runner` | the Airflow image | — | Triggers the four DAGs in order and waits for each |
 | `smoke` | `python:3.12-alpine` (standard library only) | — | Lightweight check that the environment is populated |
@@ -299,7 +299,8 @@ metaxisdata-demo/
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
 │   ├── Dockerfile.datax             # optional profile
-│   └── entrypoint-airflow.sh        # wait for state/ol.env, source it, exec airflow standalone
+│   ├── entrypoint-airflow.sh        # wait for state/ol.env, source it, exec airflow standalone
+│   └── initdb/01-airflow-database.sql  # Airflow's own database on the store server
 ├── airflow/
 │   ├── dags/
 │   │   ├── ingest_shop_to_warehouse.py

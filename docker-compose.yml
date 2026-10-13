@@ -9,6 +9,32 @@
 # Every credential in this file is a throwaway local demo value.
 name: metaxisdata-demo
 
+# Shared by the Airflow containers. Airflow keeps its metadata in its own database on the
+# store server, and reaches the demo databases through connection URIs that are spelled with
+# exactly the same host and port the platform registered.
+x-airflow-env: &airflow-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${STORE_USER:-demo}:${STORE_PASSWORD:-demo}@metadata-db:5432/airflow
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  # A known UI login for the walkthrough (Airflow's simple auth manager).
+  AIRFLOW__SIMPLE_AUTH_MANAGER__USERS: ${AIRFLOW_ADMIN_USER:-admin}:${AIRFLOW_ADMIN_PASSWORD:-admin}
+  AIRFLOW__API__BASE_URL: http://localhost:${AIRFLOW_PORT:-8080}
+  AIRFLOW_CONN_SHOP_MYSQL: mysql://${DEMO_USER:-demo}:${DEMO_PASSWORD:-demo}@${MYSQL_HOST:-mysql-shop}:${MYSQL_PORT:-3306}/${MYSQL_DB:-shop}
+  AIRFLOW_CONN_WAREHOUSE_POSTGRES: postgres://${DEMO_USER:-demo}:${DEMO_PASSWORD:-demo}@${PG_HOST:-postgres-warehouse}:${PG_PORT:-5432}/${PG_DB:-warehouse}
+  AIRFLOW_CONN_SERVING_STARROCKS: mysql://root:@${SR_HOST:-starrocks-serving}:${SR_PORT:-9030}/ods
+  # The DAGs read these to spell their OpenLineage dataset names the same way.
+  MYSQL_HOST: ${MYSQL_HOST:-mysql-shop}
+  MYSQL_PORT: ${MYSQL_PORT:-3306}
+  MYSQL_DB: ${MYSQL_DB:-shop}
+  PG_HOST: ${PG_HOST:-postgres-warehouse}
+  PG_PORT: ${PG_PORT:-5432}
+  PG_DB: ${PG_DB:-warehouse}
+  SR_HOST: ${SR_HOST:-starrocks-serving}
+  SR_PORT: ${SR_PORT:-9030}
+  FIXTURE_DIR: /fixture
+  PYTHONPATH: /opt/demo/airflow_plugins
+  TZ: ${TZ:-UTC}
+
 services:
   # --- platform -----------------------------------------------------------------
 
@@ -21,6 +47,8 @@ services:
       POSTGRES_DB: ${STORE_DB:-metaxisdata}
     volumes:
       - metadata-db-data:/var/lib/postgresql/data
+      # Creates Airflow's own database. Runs only on an empty data directory.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${STORE_USER:-demo} -d ${STORE_DB:-metaxisdata}"]
       interval: 5s
@@ -169,6 +197,63 @@ services:
         condition: service_completed_successfully
       serving-init:
         condition: service_completed_successfully
+    restart: "no"
+
+  # --- pipeline -----------------------------------------------------------------
+
+  # One standalone Airflow: webserver, scheduler and triggerer in a single container. It
+  # waits for the ingestion key the bootstrap container wrote before it starts, because
+  # OpenLineage ingestion is key-gated and a missing key would make every event fail with
+  # 401 while the DAGs still looked green.
+  airflow:
+    image: metaxisdata-demo/airflow:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.airflow
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+    environment:
+      <<: *airflow-env
+      STATE_DIR: /state
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/plugins:/opt/demo/airflow_plugins:ro
+      - ./fixture:/fixture:ro
+      - demo-state:/state:ro
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    entrypoint: ["/bin/bash", "/opt/demo/entrypoint-airflow.sh"]
+    depends_on:
+      metadata-db:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      # Airflow 3 serves its health check from the API server, not from /health.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v2/monitor/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    restart: unless-stopped
+
+  # Triggers the four DAGs in order and waits for each. It shares the Airflow image, so it
+  # talks to the same metadata database and needs no API token.
+  etl-runner:
+    image: metaxisdata-demo/airflow:local
+    command: []
+    environment:
+      <<: *airflow-env
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/plugins:/opt/demo/airflow_plugins:ro
+      - ./fixture:/fixture:ro
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/etl_runner.sh"]
+    depends_on:
+      airflow:
+        condition: service_healthy
     restart: "no"
 
 volumes:

@@ -143,7 +143,7 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`，`mem_limit: 4g` | —（可选 `19030`/`18030`） | OLAP 服务层，数据库 `ods`/`ads` |
 | `airflow` | `docker/Dockerfile.airflow`（`apache/airflow:3.1.8-python3.12` + providers） | `8080:8080` | `airflow standalone`：webserver + scheduler + triggerer |
 | `warehouse-init` | `postgres:16-alpine`（自带 psql） | — | 建 PG schema |
-| `serving-init` | `mysql:8.4`（自带 mysql 客户端） | — | 下 StarRocks 落表与视图 DDL |
+| `serving-init` | `mysql:8.4`（自带 mysql 客户端） | — | 建 StarRocks 落表 |
 | `bootstrap` | `python:3.12-alpine`（只用标准库） | — | 建管理员、注册实例、同步、签发摄入 key、灌样例 |
 | `etl-runner` | Airflow 镜像 | — | 按序触发 4 个 DAG 并等待 |
 | `smoke` | `python:3.12-alpine`（只用标准库） | — | 轻量检查环境是否已填充 |
@@ -254,7 +254,8 @@ metaxisdata-demo/
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
 │   ├── Dockerfile.datax             # 可选 profile
-│   └── entrypoint-airflow.sh        # 等 state/ol.env → source → airflow standalone
+│   ├── entrypoint-airflow.sh        # 等 state/ol.env → source → airflow standalone
+│   └── initdb/01-airflow-database.sql  # Airflow 自己的数据库
 ├── airflow/
 │   ├── dags/{ingest_shop_to_warehouse,build_warehouse_layers,publish_to_serving,build_serving_aggregates}.py
 │   └── plugins/sql_copy_operator.py # 跨库搬运并上报 OpenLineage facet

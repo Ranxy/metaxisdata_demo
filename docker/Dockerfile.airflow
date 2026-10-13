@@ -1,0 +1,33 @@
+# Airflow for the demo's pipelines.
+#
+# One standalone container -- webserver, scheduler and triggerer in one process -- because a
+# walkthrough does not need them split. See docs/design.md, decision D3.
+#
+# Pinned to the release the upstream lineage fixture was verified against. The OpenLineage
+# provider is installed explicitly: without it Airflow emits no lineage events at all, and
+# the platform's OpenLineage pages stay empty while the DAGs still look green.
+FROM apache/airflow:3.1.8-python3.12
+
+# Point these at a mirror when the default index is not reachable, e.g.
+#   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple PIP_TRUSTED_HOST=...
+ARG PIP_INDEX_URL
+ARG PIP_TRUSTED_HOST
+
+USER root
+
+# The entrypoint waits for the OpenLineage key the bootstrap container writes, then starts
+# Airflow. See docker/entrypoint-airflow.sh. The mode is set explicitly: a checkout can carry
+# any mode, and the container has to be able to read and run the file.
+COPY docker/entrypoint-airflow.sh /opt/demo/entrypoint-airflow.sh
+RUN chmod 0755 /opt/demo/entrypoint-airflow.sh
+
+USER airflow
+
+# common-sql provides SQLExecuteQueryOperator; postgres and mysql provide the hooks the
+# pipeline uses for both PostgreSQL and StarRocks (which speaks the MySQL protocol).
+RUN pip install --no-cache-dir \
+      "apache-airflow-providers-common-sql" \
+      "apache-airflow-providers-postgres" \
+      "apache-airflow-providers-mysql" \
+      "apache-airflow-providers-openlineage" \
+      "openlineage-python"

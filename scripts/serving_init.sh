@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Create the StarRocks serving objects.
+# Create the StarRocks landing tables.
 #
-# The landing tables must exist before the pipeline loads them, and the views plus the
-# async materialized view are what the StarRocks lineage analyzer reads. Both scripts drop
-# before they create, so this is safe to re-run.
+# The landing tables have to exist before the pipeline loads them. The serving views and the
+# async materialized view are created later, by the build_serving_aggregates DAG, so that
+# this container only prepares what the first load needs.
 set -euo pipefail
 
 # --skip-comments: StarRocks' parser rejects the fixture's leading `--` comment lines when
@@ -12,8 +12,5 @@ mysql_args=(--protocol=TCP --skip-comments -h "${SR_HOST}" -P "${SR_PORT}" -uroo
 
 echo "== StarRocks: landing tables in ${SR_HOST}:${SR_PORT}"
 mysql "${mysql_args[@]}" < /fixture/starrocks/10_ods_ddl.sql
-
-echo "== StarRocks: serving views and async materialized view"
-mysql "${mysql_args[@]}" < /fixture/starrocks/20_ads_ddl.sql
 
 echo "== serving-init: done"
