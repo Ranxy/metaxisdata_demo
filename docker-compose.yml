@@ -1,0 +1,44 @@
+# metaxisdata demo -- the platform and the databases it collects from.
+#
+#   cp .env.example .env      (or just `make up`, which copies it for you)
+#   make up                   start the stack
+#   make logs                 follow it
+#   make reset                drop everything, including volumes, and start over
+#
+# Every credential in this file is a throwaway local demo value.
+name: metaxisdata-demo
+
+services:
+  # The platform's own metadata store. Not published: only metaxisdata needs it.
+  metadata-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${STORE_USER:-demo}
+      POSTGRES_PASSWORD: ${STORE_PASSWORD:-demo}
+      POSTGRES_DB: ${STORE_DB:-metaxisdata}
+    volumes:
+      - metadata-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STORE_USER:-demo} -d ${STORE_DB:-metaxisdata}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # The platform. The image embeds the web UI, so this is the only published port
+  # a user needs. Its schema is migrated on start-up.
+  metaxisdata:
+    image: ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.1}
+    environment:
+      PG_URL: postgres://${STORE_USER:-demo}:${STORE_PASSWORD:-demo}@metadata-db:5432/${STORE_DB:-metaxisdata}?sslmode=disable
+      METAXISDATA_JSON_LOGGING: "true"
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${METAXISDATA_PORT:-8083}:8083"
+    depends_on:
+      metadata-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  metadata-db-data:
