@@ -51,6 +51,8 @@ make up
                 采集全部 schema，并画出数据血缘
 ```
 
+![血缘图：选中一张表后，可以看到它的详情、上下游对象数量，以及每条关系来自哪种分析](assets/lineage-columns.png)
+
 ---
 
 ## 走一遍演示
@@ -60,6 +62,8 @@ make up
 **Data → Instances**：三个数据库已注册并采集完成，分别是 `mysql-shop`（MySQL）、
 `postgres-warehouse`（PostgreSQL）、`starrocks-serving`（StarRocks）。
 
+![实例管理：注册的三个数据库、各自的引擎与最近一次同步时间](assets/instances.png)
+
 打开 **Metadata**，选 MySQL 实例里的 `shop.orders`：列、类型、索引、DDL、大小都在。然后执行
 
 ```bash
@@ -68,6 +72,8 @@ make evolve
 
 它会给这张表加一列并重新同步。回到同一张表打开 **history**：这次变更被记录了下来，带 diff，摘要为
 `+1 column`。
+
+![元数据浏览中的 orders 表：列、索引、行数与大小](assets/metadata-table.png)
 
 ### 2. 由 SQL 推导出的血缘
 
@@ -93,6 +99,8 @@ shop.orders → warehouse.ods.orders → v_order_base / v_order_line
 
 物化视图那个 task 上有一条「语句无法解析」的告警 —— 这是 Airflow 自身 SQL 解析器的限制，平台选择把它显示出来，
 而不是悄悄丢掉这段血缘。
+
+![OpenLineage run：读写的数据集、跳转 Airflow 任务日志的链接，以及那条无法解析的语句](assets/openlineage-run.png)
 
 ### 5. 不是视图的语句
 
@@ -141,4 +149,4 @@ make ol-demo
 ## 更多
 
 - [README.md](README.md) — 英文版同样内容
-- [docs/design.zh.md](docs/design.zh.md) — 这个 demo 是怎么搭起来的（面向维护者）
+- [.agent/docs/design.zh.md](.agent/docs/design.zh.md) — 这个 demo 是怎么搭起来的（面向维护者）

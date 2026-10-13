@@ -18,7 +18,7 @@
 | Databases | MySQL 8 (`shop`, OLTP) → PostgreSQL 16 (`warehouse`, ods/dwd/ads) → StarRocks (`serving`, OLAP) + the platform's own PostgreSQL store |
 | ETL | Airflow 3.1 in a single `airflow standalone` container, with a small `SqlCopyOperator` for the cross-engine hops |
 | Lineage sources | SQL analyzers (views / materialized views), OpenLineage (SQL facet + column-level facet), manual SQL, application SQL |
-| Docs | English first (`README.md`, `docs/design.md`) with a Chinese mirror (`README.zh.md`, `docs/design.zh.md`); all code comments in English |
+| Docs | English first (`README.md`, `.agent/docs/design.md`) with a Chinese mirror (`README.zh.md`, `.agent/docs/design.zh.md`); all code comments in English |
 | Verification | Deliberately light: `make smoke` checks the environment is populated. This is a demo, not a test suite |
 | Secrets | None in the repo. Runtime keys are generated into a gitignored `state/` volume |
 
@@ -297,7 +297,6 @@ caveats. Each of these is a normal next step for whoever extends the demo.
 | SQL Server, MariaDB | Supported by the platform, not started here. Two more services plus two registrations in `scripts/bootstrap.py`. |
 | MCP and the `mxd` CLI | Ship with the platform repository and need an externally reachable `external_url`; see the platform's `docs/mcp.md`. |
 | DataX | Its upstream binary has no reliable public source (the vendor mirror answers 403). The demo copies with `airflow/plugins/sql_copy_operator.py`; `metaxisdata/test/e2e_etl` remains the reference for the DataX path. |
-| Screenshots | The walkthrough describes what to expect on screen instead. |
 | Signing the demo repository's commits | Local preference, not a property of the demo. |
 
 ---
@@ -311,9 +310,9 @@ metaxisdata-demo/
 ├── .env.example                     # non-secret demo configuration, documented
 ├── Makefile                         # up, down, reset, logs, smoke, evolve, check-secrets
 ├── README.md / README.zh.md         # quick start + the S1–S8 walkthrough
-├── docs/
-│   ├── design.md / design.zh.md     # this document
-│   └── images/                      # screenshots referenced by the README
+├── .agent/docs/                     # maintainer notes; not part of the visitor guide
+│   └── design.md / design.zh.md     # this document
+├── assets/                          # screenshots the README shows (PNG, English, light theme)
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
 │   ├── Dockerfile.datax             # optional profile
@@ -569,4 +568,6 @@ conventional-commit style used by the source repo.
 1. Should the optional profiles stay out of the default quick-start so the first run stays fast? *(Assumed: yes.)*
 2. Are three engines enough for the "different database types" story, or should SQL Server join the default set
    despite the extra 1.5 GB image and 2 GB of RAM? *(Assumed: three by default.)*
-3. Screenshots for the README — captured from this machine, or left as placeholders for the maintainers?
+3. Screenshots: four are in `assets/`, captured against the running demo with headless Chrome driven over
+   CDP (English, light theme). They are not regenerated automatically — re-capture them by hand when the UI
+   changes. Add more if the walkthrough would benefit.

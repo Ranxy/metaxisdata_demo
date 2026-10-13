@@ -16,7 +16,7 @@
 | 数据库 | MySQL 8（`shop`，OLTP）→ PostgreSQL 16（`warehouse`，ods/dwd/ads）→ StarRocks（`serving`，OLAP）+ 平台自身 PostgreSQL 存储 |
 | ETL | Airflow 3.1 单容器 `airflow standalone` + 自带 `SqlCopyOperator` 承担跨库搬运 |
 | 血缘来源 | SQL 分析器（视图/物化视图）、OpenLineage（SQL facet + 列级 facet）、手工 SQL、应用 SQL |
-| 文档 | 英文为主（`README.md`、`docs/design.md`），中文镜像（`README.zh.md`、`docs/design.zh.md`）；代码注释一律英文 |
+| 文档 | 英文为主（`README.md`、`.agent/docs/design.md`），中文镜像（`README.zh.md`、`.agent/docs/design.zh.md`）；代码注释一律英文 |
 | 验证 | 刻意保持轻量：`make smoke` 只回答「演示环境是否已填充」。这是 demo，不是测试套件 |
 | 密钥 | 仓库内零密钥；运行时生成的 key 落在被 gitignore 的 `state/` 卷 |
 
@@ -251,7 +251,6 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | SQL Server、MariaDB | 平台支持，但本 demo 没有启动；代价是两个额外服务，加 `scripts/bootstrap.py` 里的两处注册。 |
 | MCP 与 `mxd` CLI | 随平台仓库发布，且需要外部可访问的 `external_url`，见平台 `docs/mcp.md`。 |
 | DataX | 上游二进制没有可靠的公开来源（厂商镜像返回 403）。demo 改用 `airflow/plugins/sql_copy_operator.py` 搬运；DataX 路径的参考仍是 `metaxisdata/test/e2e_etl`。 |
-| 截图 | 走查文档改为描述「屏幕上应该看到什么」。 |
 | demo 仓库提交签名 | 属于本地偏好，不是 demo 本身的属性。 |
 
 ---
@@ -265,9 +264,9 @@ metaxisdata-demo/
 ├── .env.example                     # 非密钥的 demo 配置
 ├── Makefile                         # up / down / reset / logs / smoke / evolve / check-secrets
 ├── README.md / README.zh.md         # 快速开始 + S1–S8 走查
-├── docs/
-│   ├── design.md / design.zh.md     # 本方案（英文为主 + 中文镜像）
-│   └── images/                      # README 引用的截图
+├── .agent/docs/                     # 维护者笔记，不属于访客指南
+│   └── design.md / design.zh.md     # 本方案（英文为主 + 中文镜像）
+├── assets/                          # README 展示的截图（PNG、英文、浅色）
 ├── docker/
 │   ├── Dockerfile.airflow           # Airflow 3.1.8 + providers + openlineage-python
 │   ├── Dockerfile.datax             # 可选 profile
@@ -445,4 +444,5 @@ metadata-db(healthy)
 
 1. 可选 profile 是否保持在默认快速开始之外，以保证首次启动足够快？（暂定：是）
 2. 三引擎是否足够支撑「不同数据库类型」的叙事，还是把 SQL Server 放进默认（代价 +1.5GB 镜像、+2GB 内存）？（暂定：默认三引擎）
-3. README 的截图：由本机采集，还是先留占位由维护者补？
+3. 截图：`assets/` 下已有 4 张，是对着运行中的 demo 用无头 Chrome（CDP）采集的（英文、浅色）。它们不是
+   自动生成的，UI 变化时需要手动重拍；如果走查需要，也可以再补。

@@ -50,6 +50,8 @@ These are throwaway passwords for this local demo; nothing here is production-sh
              collects every schema, and draws the lineage
 ```
 
+![The lineage graph with a table selected: its details, how many objects are upstream and downstream, and which source each relation came from](assets/lineage-columns.png)
+
 ---
 
 ## Take the tour
@@ -58,6 +60,8 @@ These are throwaway passwords for this local demo; nothing here is production-sh
 
 **Data → Instances.** Three databases are registered and synced: `mysql-shop` (MySQL),
 `postgres-warehouse` (PostgreSQL) and `starrocks-serving` (StarRocks).
+
+![Instance management: the three registered databases, their engines and their last sync](assets/instances.png)
 
 Open **Metadata** and pick `shop.orders` in the MySQL instance: columns, types, indexes, DDL and
 size. Then run
@@ -68,6 +72,8 @@ make evolve
 
 which adds a column to that table and re-syncs. Back on the same table, open its **history**: the
 change is recorded with a diff, summarised as `+1 column`.
+
+![The orders table in the metadata browser: columns, indexes, row count and size](assets/metadata-table.png)
 
 ### 2. Lineage that comes from SQL
 
@@ -97,6 +103,8 @@ lineage.
 
 On the materialized-view task there is a warning that the statement could not be parsed — a
 limitation of Airflow's own SQL parser, surfaced here instead of silently losing the lineage.
+
+![An OpenLineage run: the datasets it read and wrote, a link to the Airflow task log, and the statement that could not be parsed](assets/openlineage-run.png)
 
 ### 5. Statements that are not views
 
@@ -150,4 +158,4 @@ real tables.
 ## More
 
 - [README.zh.md](README.zh.md) — the same guide in Chinese
-- [docs/design.md](docs/design.md) — how this demo is put together, for maintainers
+- [.agent/docs/design.md](.agent/docs/design.md) — how this demo is put together, for maintainers

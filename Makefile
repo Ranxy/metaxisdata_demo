@@ -5,7 +5,7 @@
 #   make smoke                     is the demo populated?
 #   make reset                     drop everything, including volumes, and start over
 #
-# See README.md for the walkthrough and docs/design.md for the why.
+# See README.md for the walkthrough and .agent/docs/design.md for the why.
 
 SHELL := /usr/bin/env bash
 
