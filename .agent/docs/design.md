@@ -14,7 +14,7 @@
 | Item | Decision |
 | --- | --- |
 | Deliverable | A public repo, `metaxisdata-demo`, that runs the whole stack from one compose command |
-| Platform | Official image `ghcr.io/ranxy/metaxisdata:v0.1.1` — **never built from source**, so the demo stays small and focused on *how to use the product* |
+| Platform | Official image `ghcr.io/ranxy/metaxisdata:v0.1.2` — **never built from source**, so the demo stays small and focused on *how to use the product* |
 | Databases | MySQL 8 (`shop`, OLTP) → PostgreSQL 16 (`warehouse`, ods/dwd/ads) → StarRocks (`serving`, OLAP) + the platform's own PostgreSQL store |
 | ETL | Airflow 3.1 in a single `airflow standalone` container, with a small `SqlCopyOperator` for the cross-engine hops |
 | Lineage sources | SQL analyzers (views / materialized views), OpenLineage (SQL facet + column-level facet), manual SQL, application SQL |
@@ -55,16 +55,16 @@ this machine's Docker host. Nothing here is assumed.
 
 | Capability | Fact |
 | --- | --- |
-| Engines accepted | `MSSQL, MYSQL, POSTGRES, TIDB, MARIADB, OCEANBASE, STARROCKS, DORIS` (`proto/store/store/common.proto:16-30`, enforced at `backend/api/v1/instance_service.go:185-194`) |
+| Engines accepted | `MSSQL, MYSQL, POSTGRES, TIDB, MARIADB, OCEANBASE, STARROCKS, DORIS` (`proto/store/store/common.proto:16-30`, enforced at `backend/api/v1/instance_service.go:194-210`) |
 | Schema sync | All eight engines implement instance + schema sync (`backend/plugin/db/{mysql,pg,starrocks,mssql}`) |
-| SQL lineage analyzers | MySQL family, PostgreSQL, StarRocks only — **MSSQL has no analyzer** (`backend/plugin/lineage/engines/engines.go:26-34`) |
-| Instance creation | `CreateInstance` requires exactly one `ADMIN` data source and **already triggers a sync** (`backend/api/v1/instance_service.go:158-226`) |
+| SQL lineage analyzers | MySQL family (MySQL/TiDB/MariaDB), PostgreSQL, StarRocks, Doris and MSSQL; OceanBase is deliberately absent (`backend/plugin/lineage/engines/engines.go:31-40`) |
+| Instance creation | `CreateInstance` requires exactly one `ADMIN` data source and **already triggers a sync** (`backend/api/v1/instance_service.go:116-235`) |
 | Sync account | Schema sync always opens the `ADMIN` data source, never a `READ_ONLY` one (`backend/runner/schemasync/syncer.go:448,601`) |
 | First account | `CreateUser` is credential-exempt while no end user exists; the first `END_USER` becomes `workspaceAdmin` (`backend/api/v1/user_service.go:243-270`) |
 | Password policy | Enforced: length, digits, letters, uppercase, special characters (`backend/api/v1/user_service.go:277-292`) |
 | Scripting transport | ConnectRPC `POST /metaxisdata.v1.<Service>/<Method>` (protojson) alongside the grpc-gateway `/v1/*` mirror. Request bodies differ (`body: "user"` vs `{"user": …}`) — **scripts use the Connect paths** |
 | CSRF | Any request carrying `Authorization` is exempt; cookie-less requests pass (`backend/server/csrf.go:29-34`) |
-| OpenLineage ingestion | `POST /api/v1/lineage` (+ `/batch`), plain REST, **requires `Authorization: Bearer ol_…`**; RunEvents only; **only `COMPLETE` events produce lineage** (`backend/api/v1/openlineage_handler.go:148-166`, `backend/plugin/openlineage/processor.go:48-72`) |
+| OpenLineage ingestion | `POST /api/v1/lineage` (+ `/batch`), plain REST, **requires `Authorization: Bearer ol_…`**; RunEvents only; **only `COMPLETE` events produce lineage** (`backend/api/v1/openlineage_handler.go:148-166`, `backend/plugin/openlineage/processor.go:51-63`) |
 | SQL-facet events | Ingested events that carry `job.facets.sql` are **re-analysed by the server's own analyzer**; the producer's `columnLineage` facet is deliberately ignored (`backend/plugin/openlineage/sql_facet_lineage.go`) |
 | Unmapped namespaces | Not an error: the dataset falls back to `external:<namespace>:<name>` and admins get a deduped notification (`backend/plugin/openlineage/resolver.go:120-213`) |
 | Airflow deep links | Derived from the event's `run.facets.airflow.taskInstance.log_url`; no extra configuration (`backend/plugin/openlineage/airflow_links.go:9-47`) |
@@ -73,15 +73,26 @@ this machine's Docker host. Nothing here is assumed.
 | Process env | The server process reads only `PG_URL` (required), `METAXISDATA_ENCRYPTION_KEY`, `METAXISDATA_ENCRYPTION_KEY_PREVIOUS`; the other `METAXISDATA_*` names are image entrypoint → flag mappings |
 | Store bootstrap | The schema is migrated at start-up; the DB user needs `CREATE TABLE` and `CREATE EXTENSION` (`pg_trgm`) |
 
-### 2.2 Published image: what v0.1.1 contains
+### 2.2 Published image: what v0.1.2 contains
 
 All GHCR tags were compared and the image binary probed:
 
-- Tags published: `v0.1.1`, `0.1.1`, `sha-ffc38ba`, `latest` (all pointing at `sha256:db3b75d2…`), plus the older `v0.1.0` line.
-- `v0.1.1` = commit `ffc38ba`, build time `2026-10-13`.
+- Tags published: `v0.1.2`, `0.1.2`, `sha-0f76a74`, `latest` (all pointing at `sha256:5ff197b0…`), plus the older `v0.1.1` and `v0.1.0` lines.
+- `v0.1.2` = commit `0f76a74`, build time `2026-10-19`.
 - Feature probe on the image binary: `applicationSql`, `application-sql`, `identityProviders`,
-  `IdentityProviderService`, `manualSqls`, `namespaceMappings`, `deviceLogins`, `mcp_enabled` — all present.
+  `IdentityProviderService`, `manualSqls`, `namespaceMappings`, `deviceLogins`, `mcp_enabled`,
+  `connectedApp`, `ConnectedAppService` — all present.
 - Consequently **no capability detection is needed**: every scenario in this design is available in the pinned image.
+
+What moved between v0.1.1 and v0.1.2, and why the demo is unaffected:
+
+| Change in v0.1.2 | Effect on this demo |
+| --- | --- |
+| **MSSQL and Doris column-lineage analyzers**, plus CTE / wildcard / temporary-relation / StarRocks-internal-schema fixes | The default chain is MySQL → PostgreSQL → StarRocks and keeps writing the same SQL; the `extra` profile's SQL Server instance stays metadata-only. |
+| **Token-based UI design system** (blue accent, brand badge, semantic status tones) | No route, API or walkthrough step changes; the screenshots in `assets/` were re-captured against this image. |
+| **Connected apps / MCP management** (UI + API) | The `mcp` profile is still designed-not-implemented; the default stack does not exercise it. |
+| **Runner hardening and OpenLineage dataset fixes** (column-lineage support derived from stored edges, unique lineage edges) | The demo's SQL-facet and run-event paths behave as before; `make smoke` and the walkthrough are unchanged. |
+| **Table statistics decoupled from the schema diff** (refreshed at most once an hour per database, refresh times tracked in memory) | A cold `make up` stores MySQL's discovery-time InnoDB estimates (0 rows / 16 KB) until the next refresh; restart the platform and run a full sync to force one. The README screenshots use refreshed values. |
 
 ### 2.3 Reference implementation: `test/e2e_etl`
 
@@ -151,7 +162,7 @@ Docker 29.9.0 / Compose 5.6.0, 24 cores, 45 GB RAM, 628 GB free on `/var/lib/doc
 | Service | Image | Host port | Role |
 | --- | --- | --- | --- |
 | `metadata-db` | `postgres:16-alpine` | — | The platform's own store |
-| `metaxisdata` | `ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.1}` | `8083:8083` | Platform server + SPA |
+| `metaxisdata` | `ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.2}` | `8083:8083` | Platform server + SPA |
 | `mysql-shop` | `mysql:8.4` | — (opt-in `13306`) | OLTP source, database `shop`, seeded from `fixture/mysql/` |
 | `postgres-warehouse` | `postgres:16` | — (opt-in `15432`) | Warehouse, database `warehouse`, schemas `ods`/`dwd`/`ads` |
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`, `mem_limit: 4g` | — (opt-in `19030`/`18030`) | Serving layer, databases `ods`/`ads` |
@@ -199,7 +210,7 @@ implemented; the README's *What is not included* section states what that means 
 
 | # | Decision | Alternatives | Why |
 | --- | --- | --- | --- |
-| **D1** | Use the **official image only**, pinned by `METAXISDATA_VERSION` (default `v0.1.1`) | Build from source; track `latest` | The demo repo is public and independent of the source repo. A pinned tag is reproducible; `latest` drifts |
+| **D1** | Use the **official image only**, pinned by `METAXISDATA_VERSION` (default `v0.1.2`) | Build from source; track `latest` | The demo repo is public and independent of the source repo. A pinned tag is reproducible; `latest` drifts |
 | **D2** | Default ETL is **Airflow + a small `SqlCopyOperator` + `SQLExecuteQueryOperator`**; DataX becomes the optional `datax` profile | Make DataX the default | DataX has no reliable binary source and needs a JVM; a demo about metaxisdata should not depend on it. The profile keeps the faithful e2e replay available |
 | **D3** | One **`airflow standalone`** container instead of webserver + scheduler + triggerer | Three containers | Fewer moving parts for a demo; `etl-runner` shares the image and drives the CLI, so no API auth is involved |
 | **D4** | Bootstrap over **ConnectRPC + a bearer token** | grpc-gateway `/v1/*`; Playwright; the `mxd` CLI | The gateway's `body: "x"` rule makes request shapes differ; bearer requests skip CSRF; the CLI cannot create instances or sync |
@@ -556,7 +567,7 @@ conventional-commit style used by the source repo.
 | --- | --- |
 | ETL component | Airflow with the built-in `SqlCopyOperator`; DataX is an optional profile |
 | Engine scope | MySQL + PostgreSQL + StarRocks by default; SQL Server / MariaDB behind `extra` |
-| Platform image | Official image only, never built from source; pinned by `METAXISDATA_VERSION` (v0.1.1) |
+| Platform image | Official image only, never built from source; pinned by `METAXISDATA_VERSION` (v0.1.2) |
 | Repository | Public — no credentials, no tokens, throwaway demo values only |
 | Documentation | English first, with a Chinese mirror; all code comments in English |
 | Verification | Light `make smoke`, not a test suite |
@@ -570,4 +581,4 @@ conventional-commit style used by the source repo.
    despite the extra 1.5 GB image and 2 GB of RAM? *(Assumed: three by default.)*
 3. Screenshots: four are in `assets/`, captured against the running demo with headless Chrome driven over
    CDP (English, light theme). They are not regenerated automatically — re-capture them by hand when the UI
-   changes. Add more if the walkthrough would benefit.
+   changes (last done for v0.1.2). Add more if the walkthrough would benefit.

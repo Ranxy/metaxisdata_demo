@@ -59,7 +59,7 @@ services:
   # The platform itself. The image embeds the web UI, so this is the only port a user
   # needs to open. Its schema is migrated on start-up.
   metaxisdata:
-    image: ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.1}
+    image: ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.2}
     environment:
       PG_URL: postgres://${STORE_USER:-demo}:${STORE_PASSWORD:-demo}@metadata-db:5432/${STORE_DB:-metaxisdata}?sslmode=disable
       METAXISDATA_JSON_LOGGING: "true"

@@ -12,7 +12,7 @@
 | 项 | 结论 |
 | --- | --- |
 | 交付形态 | 公开仓库 `metaxisdata-demo`，一条 compose 命令拉起整栈 |
-| 平台 | **只用官方镜像** `ghcr.io/ranxy/metaxisdata:v0.1.1`，不从源码构建，保持轻量、专注「怎么用」 |
+| 平台 | **只用官方镜像** `ghcr.io/ranxy/metaxisdata:v0.1.2`，不从源码构建，保持轻量、专注「怎么用」 |
 | 数据库 | MySQL 8（`shop`，OLTP）→ PostgreSQL 16（`warehouse`，ods/dwd/ads）→ StarRocks（`serving`，OLAP）+ 平台自身 PostgreSQL 存储 |
 | ETL | Airflow 3.1 单容器 `airflow standalone` + 自带 `SqlCopyOperator` 承担跨库搬运 |
 | 血缘来源 | SQL 分析器（视图/物化视图）、OpenLineage（SQL facet + 列级 facet）、手工 SQL、应用 SQL |
@@ -50,16 +50,16 @@
 
 | 能力 | 事实 |
 | --- | --- |
-| 支持的引擎 | `MSSQL / MYSQL / POSTGRES / TIDB / MARIADB / OCEANBASE / STARROCKS / DORIS`（`proto/store/store/common.proto:16-30`，服务端白名单 `backend/api/v1/instance_service.go:185-194`） |
+| 支持的引擎 | `MSSQL / MYSQL / POSTGRES / TIDB / MARIADB / OCEANBASE / STARROCKS / DORIS`（`proto/store/store/common.proto:16-30`，服务端白名单 `backend/api/v1/instance_service.go:194-210`） |
 | 元数据采集 | 八种引擎都实现了实例与 schema 同步（`backend/plugin/db/{mysql,pg,starrocks,mssql}`） |
-| SQL 血缘分析器 | 只有 MySQL 系、PostgreSQL、StarRocks；**MSSQL 没有分析器**（`backend/plugin/lineage/engines/engines.go:26-34`） |
-| 建实例 | `CreateInstance` 必须恰好一个 `ADMIN` 数据源，且**成功即自动触发一次同步**（`backend/api/v1/instance_service.go:158-226`） |
+| SQL 血缘分析器 | MySQL 系（MySQL/TiDB/MariaDB）、PostgreSQL、StarRocks、Doris、MSSQL；OceanBase 故意不提供（`backend/plugin/lineage/engines/engines.go:31-40`） |
+| 建实例 | `CreateInstance` 必须恰好一个 `ADMIN` 数据源，且**成功即自动触发一次同步**（`backend/api/v1/instance_service.go:116-235`） |
 | 采集账号 | 采集永远用 `ADMIN` 数据源，`READ_ONLY` 不参与（`backend/runner/schemasync/syncer.go:448,601`） |
 | 首个账号 | 无用户时 `CreateUser` 免凭据；首个 `END_USER` 自动成为 `workspaceAdmin`（`backend/api/v1/user_service.go:243-270`） |
 | 密码策略 | 会校验长度/数字/字母/大写/特殊字符（`backend/api/v1/user_service.go:277-292`） |
 | 脚本化通道 | ConnectRPC `POST /metaxisdata.v1.<Service>/<Method>`（protojson）与 grpc-gateway `/v1/*` 并存；**两者 body 形状不同**，脚本统一用 Connect |
 | CSRF | 带 `Authorization` 的请求豁免；无 Cookie 的请求放行（`backend/server/csrf.go:29-34`） |
-| OL 摄入 | `POST /api/v1/lineage`（`/batch` 同义），纯 REST，**必须 `Authorization: Bearer ol_…`**；只接受 RunEvent；**只有 `COMPLETE` 事件产生血缘**（`backend/api/v1/openlineage_handler.go:148-166`、`backend/plugin/openlineage/processor.go:48-72`） |
+| OL 摄入 | `POST /api/v1/lineage`（`/batch` 同义），纯 REST，**必须 `Authorization: Bearer ol_…`**；只接受 RunEvent；**只有 `COMPLETE` 事件产生血缘**（`backend/api/v1/openlineage_handler.go:148-166`、`backend/plugin/openlineage/processor.go:51-63`） |
 | 带 SQL 的事件 | 带 `job.facets.sql` 的事件由**服务端自己的分析器**重算，生产者上报的 `columnLineage` facet 被**故意忽略**（`backend/plugin/openlineage/sql_facet_lineage.go`） |
 | 命名空间未映射 | 不报错：回退为 `external:<namespace>:<name>`，并给管理员发去重通知（`backend/plugin/openlineage/resolver.go:120-213`） |
 | Airflow 深链 | 由事件的 `run.facets.airflow.taskInstance.log_url` 自动派生（`backend/plugin/openlineage/airflow_links.go:9-47`） |
@@ -68,12 +68,23 @@
 | 进程环境变量 | 只有 `PG_URL`（必需）、`METAXISDATA_ENCRYPTION_KEY`、`METAXISDATA_ENCRYPTION_KEY_PREVIOUS`；其余 `METAXISDATA_*` 是镜像 entrypoint → flag 的映射 |
 | 存储 | 启动即自动迁移；数据库用户需要建表与建扩展（`pg_trgm`）权限 |
 
-### 2.2 已发布镜像 v0.1.1
+### 2.2 已发布镜像 v0.1.2
 
-- GHCR 上的 tag：`v0.1.1`、`0.1.1`、`sha-ffc38ba`、`latest`（都指向同一个 digest `sha256:db3b75d2…`），另有旧的 `v0.1.0` 系列。
-- `v0.1.1` = commit `ffc38ba`，构建于 2026-10-13。
-- 对镜像内二进制做特性探测：`applicationSql`、`application-sql`、`identityProviders`、`IdentityProviderService`、`manualSqls`、`namespaceMappings`、`deviceLogins`、`mcp_enabled` **全部存在**。
+- GHCR 上的 tag：`v0.1.2`、`0.1.2`、`sha-0f76a74`、`latest`（都指向同一个 digest `sha256:5ff197b0…`），另有旧的 `v0.1.1`、`v0.1.0` 系列。
+- `v0.1.2` = commit `0f76a74`，构建于 2026-10-19。
+- 对镜像内二进制做特性探测：`applicationSql`、`application-sql`、`identityProviders`、`IdentityProviderService`、`manualSqls`、`namespaceMappings`、`deviceLogins`、`mcp_enabled`、`connectedApp`、`ConnectedAppService` **全部存在**。
 - 因此**不需要能力探测**：本方案里的所有场景在固定镜像上都可用。
+
+v0.1.2 相对 v0.1.1 的变化，以及为什么 demo 不受影响：
+
+| v0.1.2 的变化 | 对本 demo 的影响 |
+| --- | --- |
+| **新增 MSSQL、Doris 列级血缘分析器**，并修复 CTE / 通配符 / 临时关系 / StarRocks 内部 schema | 默认链路是 MySQL → PostgreSQL → StarRocks，写入的 SQL 不变；`extra` profile 里的 SQL Server 实例仍只做元数据。 |
+| **基于 token 的 UI 设计系统**（蓝色主色、品牌徽标、语义状态色） | 路由、API、走查步骤均不变；`assets/` 截图已针对该镜像重新采集。 |
+| **Connected apps / MCP 管理**（前端 + API） | `mcp` profile 仍是「设计未实现」；默认栈不涉及。 |
+| **runner 加固与 OpenLineage dataset 修复**（列级血缘能力由已存边推导、血缘边唯一） | demo 的 SQL facet 与 run event 路径行为不变；`make smoke` 与走查不受影响。 |
+| **表统计与 schema diff 解耦**（每个数据库最多每小时刷新一次，刷新时间记在内存） | 冷启动 `make up` 会存下 MySQL discovery 时的 InnoDB 估算值（0 行 / 16 KB），直到下一次刷新；重启平台并跑一次 full sync 可强制刷新。README 截图使用的是刷新后的值。 |
+
 
 ### 2.3 参考实现 `test/e2e_etl`
 
@@ -137,7 +148,7 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 | 服务 | 镜像 | 宿主端口 | 作用 |
 | --- | --- | --- | --- |
 | `metadata-db` | `postgres:16-alpine` | — | 平台自身元数据库 |
-| `metaxisdata` | `ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.1}` | `8083:8083` | 平台 server + 前端 |
+| `metaxisdata` | `ghcr.io/ranxy/metaxisdata:${METAXISDATA_VERSION:-v0.1.2}` | `8083:8083` | 平台 server + 前端 |
 | `mysql-shop` | `mysql:8.4` | —（可选 `13306`） | OLTP 源库，数据库 `shop`，由 `fixture/mysql/` 初始化 |
 | `postgres-warehouse` | `postgres:16` | —（可选 `15432`） | 数仓，数据库 `warehouse`，schema `ods`/`dwd`/`ads` |
 | `starrocks-serving` | `starrocks/allin1-ubuntu:4.1-latest`，`mem_limit: 4g` | —（可选 `19030`/`18030`） | OLAP 服务层，数据库 `ods`/`ads` |
@@ -184,7 +195,7 @@ Docker 29.9.0 / Compose 5.6.0，24 核 / 45GB RAM / 628GB 可用磁盘；`ghcr.i
 
 | # | 决策 | 理由 |
 | --- | --- | --- |
-| **D1** | **只用官方镜像**，用 `METAXISDATA_VERSION` 固定（默认 `v0.1.1`） | demo 仓库公开且与源码仓库解耦；固定 tag 可复现，`latest` 会漂移 |
+| **D1** | **只用官方镜像**，用 `METAXISDATA_VERSION` 固定（默认 `v0.1.2`） | demo 仓库公开且与源码仓库解耦；固定 tag 可复现，`latest` 会漂移 |
 | **D2** | 默认 ETL = **Airflow + 自带 `SqlCopyOperator` + `SQLExecuteQueryOperator`**；DataX 降级为可选 profile | DataX 无可靠二进制、需要 JVM；demo 的主角是 metaxisdata |
 | **D3** | Airflow 用**单容器 `airflow standalone`** | 演示场景下组件越少越稳；`etl-runner` 共享镜像走 CLI，不需要 API 鉴权 |
 | **D4** | 引导走 **ConnectRPC + Bearer token** | gateway 与 Connect 的 body 形状不同易踩坑；带 Authorization 豁免 CSRF；`mxd` CLI 不能建实例/同步 |
@@ -433,7 +444,7 @@ metadata-db(healthy)
 | --- | --- |
 | ETL 组件 | Airflow + 自带 `SqlCopyOperator`；DataX 为可选 profile |
 | 引擎范围 | 默认 MySQL + PostgreSQL + StarRocks；SQL Server / MariaDB 走 `extra` |
-| 平台镜像 | 只用官方镜像、不从源码构建；由 `METAXISDATA_VERSION` 固定（v0.1.1） |
+| 平台镜像 | 只用官方镜像、不从源码构建；由 `METAXISDATA_VERSION` 固定（v0.1.2） |
 | 仓库 | 公开：零密钥、零 token，只有一次性 demo 凭据 |
 | 文档 | 英文为主 + 中文镜像；代码注释一律英文 |
 | 验证 | 轻量 `make smoke`，不做测试套件 |
@@ -445,4 +456,4 @@ metadata-db(healthy)
 1. 可选 profile 是否保持在默认快速开始之外，以保证首次启动足够快？（暂定：是）
 2. 三引擎是否足够支撑「不同数据库类型」的叙事，还是把 SQL Server 放进默认（代价 +1.5GB 镜像、+2GB 内存）？（暂定：默认三引擎）
 3. 截图：`assets/` 下已有 4 张，是对着运行中的 demo 用无头 Chrome（CDP）采集的（英文、浅色）。它们不是
-   自动生成的，UI 变化时需要手动重拍；如果走查需要，也可以再补。
+   自动生成的，UI 变化时需要手动重拍（v0.1.2 时已重拍一次）；如果走查需要，也可以再补。
